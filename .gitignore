@@ -73,3 +73,8 @@ dkms.conf
 
 # Cmake files
 cmake-build-debug/
+build/
+
+# Clangd
+.cache/
+
