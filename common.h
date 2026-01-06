@@ -1,4 +1,19 @@
 #ifndef SO_PROJEKT_COMMON_H
 #define SO_PROJEKT_COMMON_H
 
+enum IDENTITY {
+    PETENT,
+    URZEDNIK,
+    DYREKTOR,
+    REJESTRACJA
+};
+
+enum URZEDNIK_ROLE {
+    ROLE_SC,
+    ROLE_KM,
+    ROLE_ML,
+    ROLE_PD,
+    ROLE_SA
+};
+
 #endif //SO_PROJEKT_COMMON_H
