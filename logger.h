@@ -42,32 +42,32 @@ private:
         }
     }
 
-    static constexpr std::string_view identity_to_string(IDENTITY identity) noexcept {
+    static constexpr std::string_view identity_to_string(Identity identity) noexcept {
         switch (identity) {
-            case PETENT:
+            case Identity::Petent:
                 return "PETENT";
-            case URZEDNIK:
+            case Identity::Urzednik:
                 return "URZEDNIK";
-            case DYREKTOR:
+            case Identity::Dyrektor:
                 return "DYREKTOR";
-            case REJESTRACJA:
+            case Identity::Rejestracja:
                 return "REJESTRACJA";
             default:
                 return "UNKNOWN";
         }
     }
 
-    static constexpr std::string_view role_to_string(URZEDNIK_ROLE role) noexcept {
+    static constexpr std::string_view role_to_string(UrzednikRole role) noexcept {
         switch (role) {
-            case ROLE_SC:
+            case UrzednikRole::SC:
                 return "SC";
-            case ROLE_KM:
+            case UrzednikRole::KM:
                 return "KM";
-            case ROLE_ML:
+            case UrzednikRole::ML:
                 return "ML";
-            case ROLE_PD:
+            case UrzednikRole::PD:
                 return "PD";
-            case ROLE_SA:
+            case UrzednikRole::SA:
                 return "SA";
             default:
                 return "UNKNOWN";
@@ -122,7 +122,7 @@ private:
 
 public:
     // Identity only log
-    static void log(LogSeverity severity, IDENTITY identity, const std::string& message) {
+    static void log(LogSeverity severity, Identity identity, const std::string& message) {
         std::ostringstream ss;
         ss << get_current_timestamp() << " "
            << "[PID:" << getpid() << "] "
@@ -133,7 +133,7 @@ public:
     }
 
     // Identity and urzednik role log
-    static void log(LogSeverity severity, IDENTITY identity, URZEDNIK_ROLE role, const std::string& message) {
+    static void log(LogSeverity severity, Identity identity, UrzednikRole role, const std::string& message) {
         std::ostringstream ss;
         ss << get_current_timestamp() << " "
            << "[PID:" << getpid() << "] "
