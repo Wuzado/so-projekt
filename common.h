@@ -15,6 +15,14 @@ struct SharedState {
     OfficeStatus office_status;
 };
 
+void init_shared_state(SharedState& state, unsigned int capacity) {
+    state.building_capacity = capacity;
+    state.current_queue_length = 0;
+    state.ticket_machines_num = 1;
+    state.simulated_time = 0; 
+    state.office_status = OfficeStatus::Closed;
+}
+
 constexpr int TIME_MUL = 1000;
 
 #endif // SO_PROJEKT_COMMON_H
