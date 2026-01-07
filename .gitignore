@@ -55,6 +55,7 @@
 *.i*86
 *.x86_64
 *.hex
+so_projekt
 
 # Debug files
 *.dSYM/
