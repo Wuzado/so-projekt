@@ -36,7 +36,7 @@ namespace ipc {
     namespace shm {
 
         template <typename T>
-        int shm_create(key_t key, mode_t permissions = 0660) {
+        int create(key_t key, mode_t permissions = 0660) {
             int shmid = shmget(key, sizeof(T), IPC_CREAT | IPC_EXCL | permissions);
             if (shmid == -1) {
                 perror("shmget failed");
@@ -46,7 +46,7 @@ namespace ipc {
         }
 
         template <typename T>
-        int shm_get(key_t key) {
+        int get(key_t key) {
             int shmid = shmget(key, sizeof(T), 0);
             if (shmid == -1) {
                 perror("shmget failed");
@@ -56,7 +56,7 @@ namespace ipc {
         }
 
         template <typename T>
-        T* shm_attach(int shmid, bool readonly = true) {
+        T* attach(int shmid, bool readonly = true) {
             int flags = readonly ? SHM_RDONLY : 0;
             void* addr = shmat(shmid, nullptr, flags);
             if (addr == (void*)-1) {
@@ -67,7 +67,7 @@ namespace ipc {
         }
 
         template <typename T>
-        int shm_detach(T* ptr) {
+        int detach(T* ptr) {
             if (shmdt(ptr) == -1) {
                 perror("shmdt failed");
                 return -1;
@@ -75,7 +75,7 @@ namespace ipc {
             return 0;
         }
 
-        int shm_remove(int shmid) {
+        int remove(int shmid) {
             if (shmctl(shmid, IPC_RMID, nullptr) == -1) {
                 perror("shmctl IPC_RMID failed");
                 return -1;
