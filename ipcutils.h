@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <cstdio>
+#include <pthread.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <sys/types.h>
@@ -84,6 +85,38 @@ namespace ipc {
         }
 
     } // namespace shm
+
+    namespace thread {
+        int create(pthread_t* thread, void* (*start_routine)(void*), void* arg,
+                          const pthread_attr_t* attr = nullptr) {
+            if (pthread_create(thread, attr, start_routine, arg) != 0) {
+                perror("pthread_create failed");
+                return -1;
+            }
+            return 0;
+        }
+
+        int join(pthread_t thread, void** retval = nullptr) {
+            if (pthread_join(thread, retval) != 0) {
+                perror("pthread_join failed");
+                return -1;
+            }
+            return 0;
+        }
+
+        int detach(pthread_t thread) {
+            if (pthread_detach(thread) != 0) {
+                perror("pthread_detach failed");
+                return -1;
+            }
+            return 0;
+        }
+
+        void exit(void* retval = nullptr) {
+            pthread_exit(retval);
+        }
+
+    } // namespace thread
 } // namespace ipc
 
 #endif // SO_PROJEKT_IPCUTILS_H
