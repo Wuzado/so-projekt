@@ -2,7 +2,7 @@
 #include <chrono>
 #include <csignal>
 #include <cstring>
-#include <fstream>
+#include <fcntl.h>
 #include <pthread.h>
 #include <thread>
 #include <unistd.h>
@@ -15,10 +15,10 @@ static void handle_shutdown_signal(int) {
     simulation_running = false;
 }
 
-void cleanup(SharedState* shared_state, int shm_id, std::fstream& lock_file) {
+void cleanup(SharedState* shared_state, int shm_id, int lock_file) {
     ipc::shm::detach(shared_state);
     ipc::shm::remove(shm_id);
-    lock_file.close();
+    close(lock_file);
     unlink(ipc::IPC_LOCK_FILE);
 }
 
@@ -26,9 +26,9 @@ int dyrektor_main(HoursOpen hours_open) {
     std::signal(SIGINT, handle_shutdown_signal);
     std::signal(SIGTERM, handle_shutdown_signal);
 
-    std::fstream lock_file(ipc::IPC_LOCK_FILE, std::ios::trunc);
+    int lock_file = open(ipc::IPC_LOCK_FILE, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 
-    if (!lock_file.is_open()) {
+    if (lock_file == -1) {
         std::string error = "Nie udalo sie utworzyc pliku blokady IPC: " + std::string(std::strerror(errno));
         Logger::log(LogSeverity::Emerg, Identity::Dyrektor, error);
         return 1;
@@ -38,19 +38,19 @@ int dyrektor_main(HoursOpen hours_open) {
 
     key_t shm_key = ipc::make_key(ipc::KeyType::SharedState);
     if (shm_key == -1) {
-        lock_file.close();
+        close(lock_file);
         return 1;
     }
 
     int shm_id = ipc::shm::create<SharedState>(shm_key);
     if (shm_id == -1) {
-        lock_file.close();
+        close(lock_file);
         return 1;
     }
 
     auto shared_state = ipc::shm::attach<SharedState>(shm_id, false);
     if (!shared_state) {
-        lock_file.close();
+        close(lock_file);
         ipc::shm::remove(shm_id);
         return 1;
     }
