@@ -76,7 +76,7 @@ namespace ipc {
             return 0;
         }
 
-        int remove(int shmid) {
+        inline int remove(int shmid) {
             if (shmctl(shmid, IPC_RMID, nullptr) == -1) {
                 perror("shmctl IPC_RMID failed");
                 return -1;
@@ -87,7 +87,7 @@ namespace ipc {
     } // namespace shm
 
     namespace thread {
-        int create(pthread_t* thread, void* (*start_routine)(void*), void* arg,
+        inline int create(pthread_t* thread, void* (*start_routine)(void*), void* arg,
                           const pthread_attr_t* attr = nullptr) {
             if (pthread_create(thread, attr, start_routine, arg) != 0) {
                 perror("pthread_create failed");
@@ -96,7 +96,7 @@ namespace ipc {
             return 0;
         }
 
-        int join(pthread_t thread, void** retval = nullptr) {
+        inline int join(pthread_t thread, void** retval = nullptr) {
             if (pthread_join(thread, retval) != 0) {
                 perror("pthread_join failed");
                 return -1;
@@ -104,7 +104,7 @@ namespace ipc {
             return 0;
         }
 
-        int detach(pthread_t thread) {
+        inline int detach(pthread_t thread) {
             if (pthread_detach(thread) != 0) {
                 perror("pthread_detach failed");
                 return -1;
@@ -112,7 +112,7 @@ namespace ipc {
             return 0;
         }
 
-        void exit(void* retval = nullptr) {
+        inline void exit(void* retval = nullptr) {
             pthread_exit(retval);
         }
 
