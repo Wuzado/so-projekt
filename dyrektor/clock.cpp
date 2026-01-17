@@ -24,6 +24,10 @@ void init_clock(SharedState* state, HoursOpen hours_open) {
         bool wait_after_close = false;
 
         while (state->simulated_time < hours_open.second * 3600 + 120) {
+            if (!simulation_running.load()) {
+                break;
+            }
+
             std::this_thread::sleep_for(std::chrono::milliseconds(1000 / TIME_MUL));
 
             state->simulated_time++;
