@@ -21,14 +21,17 @@ void init_clock(SharedState* state, HoursOpen hours_open) {
         std::string message = std::format("Dzien {}: Urzad otwarty.", state->day + 1);
         Logger::log(LogSeverity::Info, Identity::Dyrektor, message);
 
+        bool wait_after_close = false;
+
         while (state->simulated_time < hours_open.second * 3600 + 120) {
             std::this_thread::sleep_for(std::chrono::milliseconds(1000 / TIME_MUL));
 
             state->simulated_time++;
 
-            if (state->simulated_time >= hours_open.second * 3600) {
+            if (state->simulated_time >= hours_open.second * 3600 && !wait_after_close) {
                 state->office_status = OfficeStatus::Closed;
                 Logger::log(LogSeverity::Info, Identity::Dyrektor, "Urząd zamknięty.");
+                wait_after_close = true;
             }
         }
 
