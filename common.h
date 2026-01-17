@@ -1,6 +1,7 @@
 #ifndef SO_PROJEKT_COMMON_H
 #define SO_PROJEKT_COMMON_H
 
+#include <cstdint>
 #include <optional>
 #include <utility>
 #include <string>
@@ -21,7 +22,7 @@ inline std::optional<Identity> string_to_identity(std::string_view str) {
     return std::nullopt;
 }
 
-enum class UrzednikRole { SC, KM, ML, PD, SA };
+enum class UrzednikRole : uint8_t { SC, KM, ML, PD, SA };
 
 inline std::optional<UrzednikRole> string_to_urzednik_role(std::string_view str) {
     if (str == "SC") return UrzednikRole::SC;
@@ -45,6 +46,21 @@ struct SharedState {
     SharedState(unsigned int capacity) :
         day(0), building_capacity(capacity), current_queue_length(0), ticket_machines_num(1),
         simulated_time(0), office_status(OfficeStatus::Closed) {}
+};
+
+struct TicketRequestMsg {
+    uint32_t petent_id;
+    uint8_t is_vip; // boolean
+    uint8_t has_child; // boolean
+    uint16_t padding; // for explicit alignment
+};
+
+struct TicketIssuedMsg {
+    uint32_t petent_id;
+    uint32_t ticket_number;
+    UrzednikRole department; // uint8_t
+    uint8_t redirected_from_sa; // boolean
+    uint16_t padding; // for explicit alignment
 };
 
 #endif // SO_PROJEKT_COMMON_H

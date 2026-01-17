@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <pthread.h>
 #include <sys/ipc.h>
+#include <sys/msg.h>
 #include <sys/shm.h>
 #include <sys/types.h>
 #include "common.h"
@@ -85,6 +86,66 @@ namespace ipc {
         }
 
     } // namespace shm
+
+    // Message queues
+    namespace msg {
+
+        template <typename T>
+        struct MsgEnvelope {
+            long mtype;
+            T data;
+        };
+
+        inline int create(key_t key, mode_t permissions = 0660) {
+            int msqid = msgget(key, IPC_CREAT | IPC_EXCL | permissions);
+            if (msqid == -1) {
+                perror("msgget failed");
+                return -1;
+            }
+            return msqid;
+        }
+
+        inline int get(key_t key) {
+            int msqid = msgget(key, 0);
+            if (msqid == -1) {
+                perror("msgget failed");
+                return -1;
+            }
+            return msqid;
+        }
+
+        template <typename T>
+        int send(int msqid, long msg_type, const T& data, int flags = 0) {
+            MsgEnvelope<T> msg{msg_type, data};
+            if (msgsnd(msqid, &msg, sizeof(T), flags) == -1) {
+                perror("msgsnd failed");
+                return -1;
+            }
+            return 0;
+        }
+
+        template <typename T>
+        int receive(int msqid, long msg_type, T* data, int flags = 0) {
+            MsgEnvelope<T> msg{};
+            if (msgrcv(msqid, &msg, sizeof(T), msg_type, flags) == -1) {
+                perror("msgrcv failed");
+                return -1;
+            }
+            if (data != nullptr) {
+                *data = msg.data;
+            }
+            return 0;
+        }
+
+        inline int remove(int msqid) {
+            if (msgctl(msqid, IPC_RMID, nullptr) == -1) {
+                perror("msgctl IPC_RMID failed");
+                return -1;
+            }
+            return 0;
+        }
+
+    } // namespace msg
 
     namespace thread {
         inline int create(pthread_t* thread, void* (*start_routine)(void*), void* arg,
