@@ -2,6 +2,7 @@
 #define SO_PROJEKT_LOGGER_H
 
 #include <chrono>
+#include <cstdio>
 #include <cstring>
 #include <fcntl.h>
 #include <iomanip>
@@ -12,6 +13,8 @@
 #include <thread>
 #include <unistd.h>
 #include "common.h"
+
+constexpr bool LOG_TO_STDOUT = true;
 
 enum class LogSeverity { Emerg, Alert, Crit, Err, Warning, Notice, Info, Debug };
 
@@ -95,15 +98,30 @@ private:
         return ss.str();
     }
 
-    static void write_to_file(const std::string& message) {
+    static void write_log(const std::string& message, bool to_stdout = LOG_TO_STDOUT) {
+        if (to_stdout) {
+            fflush(stdout);
+            int fd = STDOUT_FILENO;
+
+            // Try to lock stdout if possible; ignore lock failures and still write
+            // Realistically, any messages under PIPE_BUF (4KB on modern Linux) will be atomic anyway
+            flock(fd, LOCK_EX);
+
+            ssize_t bytes_written = write(fd, message.c_str(), message.length());
+            if (bytes_written == -1) {
+                perror("Failed to write to stdout");
+            }
+
+            flock(fd, LOCK_UN);
+            return;
+        }
+
         int fd = open(log_file_path.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0644);
         if (fd == -1) {
             perror("Failed to open log file");
             return;
         }
 
-        // Lock the file using POSIX flock(2)
-        // This is used to maintain thread safety
         if (flock(fd, LOCK_EX) == -1) {
             perror("Failed to lock log file");
             close(fd);
@@ -122,25 +140,25 @@ private:
 
 public:
     // Identity only log
-    static void log(LogSeverity severity, Identity identity, const std::string& message) {
+    static void log(LogSeverity severity, Identity identity, const std::string& message, bool to_stdout = LOG_TO_STDOUT) {
         std::ostringstream ss;
         ss << get_current_timestamp() << " "
            << "[PID:" << getpid() << "] "
            << "[TID:" << std::this_thread::get_id() << "] " << severity_to_string(severity) << " "
            << identity_to_string(identity) << ": " << message << '\n';
 
-        write_to_file(ss.str());
+        write_log(ss.str(), to_stdout);
     }
 
     // Identity and urzednik role log
-    static void log(LogSeverity severity, Identity identity, UrzednikRole role, const std::string& message) {
+    static void log(LogSeverity severity, Identity identity, UrzednikRole role, const std::string& message, bool to_stdout = LOG_TO_STDOUT) {
         std::ostringstream ss;
         ss << get_current_timestamp() << " "
            << "[PID:" << getpid() << "] "
            << "[TID:" << std::this_thread::get_id() << "] " << severity_to_string(severity) << " "
            << identity_to_string(identity) << "(" << role_to_string(role) << "): " << message << '\n';
 
-        write_to_file(ss.str());
+        write_log(ss.str(), to_stdout);
     }
 
     // Set log file
