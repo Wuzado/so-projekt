@@ -1,7 +1,11 @@
 #ifndef SO_PROJEKT_COMMON_H
 #define SO_PROJEKT_COMMON_H
 
+#include <optional>
 #include <utility>
+#include <string>
+#include <string_view>
+#include <stdexcept>
 
 typedef std::pair<short, short> HoursOpen; // tp, tk
 
@@ -9,7 +13,24 @@ constexpr int TIME_MUL = 1000;
 
 enum class Identity { Petent, Urzednik, Dyrektor, Rejestracja };
 
+inline std::optional<Identity> string_to_identity(std::string_view str) {
+    if (str == "petent") return Identity::Petent;
+    if (str == "urzednik") return Identity::Urzednik;
+    if (str == "dyrektor") return Identity::Dyrektor;
+    if (str == "rejestracja") return Identity::Rejestracja;
+    return std::nullopt;
+}
+
 enum class UrzednikRole { SC, KM, ML, PD, SA };
+
+inline std::optional<UrzednikRole> string_to_urzednik_role(std::string_view str) {
+    if (str == "SC") return UrzednikRole::SC;
+    if (str == "KM") return UrzednikRole::KM;
+    if (str == "ML") return UrzednikRole::ML;
+    if (str == "PD") return UrzednikRole::PD;
+    if (str == "SA") return UrzednikRole::SA;
+    return std::nullopt;
+}
 
 enum class OfficeStatus { Open, Closed };
 
