@@ -9,4 +9,7 @@ $(TARGET): $(SRCS)
 clean:
 	rm -f $(TARGET)
 
-.PHONY: clean
+lint:
+	clang-tidy $(SRCS) -- -std=c++20 -I.
+
+.PHONY: clean lint
