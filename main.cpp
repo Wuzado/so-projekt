@@ -3,6 +3,7 @@
 #include "common.h"
 #include "logger.h"
 #include "dyrektor/dyrektor.h"
+#include "rejestracja/rejestracja.h"
 
 void print_usage(char* program_name) {
     std::cerr << "Uzycie: " << program_name << " <argumenty>\n\n"
@@ -81,10 +82,13 @@ int main(int argc, char* argv[]) {
             dyrektor_main({config->Tp, config->Tk});
             break;
         case Identity::Rejestracja:
+            rejestracja_main();
             break;
         case Identity::Urzednik:
+            Logger::log(LogSeverity::Notice, Identity::Urzednik, "Brak implementacji urzednika.");
             break;
         case Identity::Petent:
+            Logger::log(LogSeverity::Notice, Identity::Petent, "Brak implementacji petenta.");
             break;
     }
 
