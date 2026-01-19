@@ -2,8 +2,8 @@
 #define SO_PROJEKT_URZEDNIK_H
 
 
-class urzednik {
-};
+#include "../common.h"
 
+int urzednik_main(UrzednikRole role);
 
 #endif //SO_PROJEKT_URZEDNIK_H
