@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <random>
 #include <utility>
 #include <string>
 #include <string_view>
@@ -62,5 +63,13 @@ struct TicketIssuedMsg {
     uint8_t redirected_from_sa; // boolean
     uint16_t padding; // for explicit alignment
 };
+
+namespace rng {
+    inline int random_int(int min_inclusive, int max_inclusive) {
+        static thread_local std::mt19937 engine(std::random_device{}());
+        std::uniform_int_distribution<int> dist(min_inclusive, max_inclusive);
+        return dist(engine);
+    }
+}
 
 #endif // SO_PROJEKT_COMMON_H
