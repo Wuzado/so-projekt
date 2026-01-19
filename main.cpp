@@ -3,6 +3,7 @@
 #include "common.h"
 #include "logger.h"
 #include "dyrektor/dyrektor.h"
+#include "petent/petent.h"
 #include "rejestracja/rejestracja.h"
 #include "urzednik/urzednik.h"
 
@@ -104,7 +105,7 @@ int main(int argc, char* argv[]) {
             urzednik_main(*config->urzednik_role);
             break;
         case Identity::Petent:
-            Logger::log(LogSeverity::Notice, Identity::Petent, "Brak implementacji petenta.");
+            petent_main();
             break;
     }
 
