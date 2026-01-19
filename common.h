@@ -13,13 +13,14 @@ typedef std::pair<short, short> HoursOpen; // tp, tk
 
 constexpr int TIME_MUL = 1000;
 
-enum class Identity { Petent, Urzednik, Dyrektor, Rejestracja };
+enum class Identity { Petent, Urzednik, Dyrektor, Rejestracja, Generator };
 
 inline std::optional<Identity> string_to_identity(std::string_view str) {
     if (str == "petent") return Identity::Petent;
     if (str == "urzednik") return Identity::Urzednik;
     if (str == "dyrektor") return Identity::Dyrektor;
     if (str == "rejestracja") return Identity::Rejestracja;
+    if (str == "generator") return Identity::Generator;
     return std::nullopt;
 }
 

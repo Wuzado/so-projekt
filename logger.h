@@ -55,6 +55,8 @@ private:
                 return "DYREKTOR";
             case Identity::Rejestracja:
                 return "REJESTRACJA";
+            case Identity::Generator:
+                return "GENERATOR";
             default:
                 return "UNKNOWN";
         }

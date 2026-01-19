@@ -1,25 +1,26 @@
 #include <iostream>
 #include <optional>
 #include "common.h"
-#include "logger.h"
 #include "dyrektor/dyrektor.h"
+#include "logger.h"
+#include "petent/generator.h"
 #include "petent/petent.h"
 #include "rejestracja/rejestracja.h"
 #include "urzednik/urzednik.h"
 
 void print_usage(char* program_name) {
     std::cerr << "Uzycie: " << program_name << " <argumenty>\n\n"
-    << "Ogolne argumenty:\n"
-    << "  --role <rola>  "
-    << "Okresla role (dyrektor/petent/rejestracja/urzednik/generator petentow)\n"
-    << "Argumenty dyrektora:\n"
-    << "  --Tp <godzina>  "
-    << "Godzina otwarcia urzedu (0-23), domyslnie 8\n"
-    << "  --Tk <godzina>  "
-    << "Godzina zamkniecia urzedu (0-23), domyslnie 16\n"
-    << "Argumenty urzednika:\n"
-    << "  --dept <SC|KM|ML|PD|SA>  "
-    << "Wydzial urzednika\n";
+              << "Ogolne argumenty:\n"
+              << "  --role <rola>  "
+              << "Okresla role (dyrektor/petent/rejestracja/urzednik/generator)\n"
+              << "Argumenty dyrektora:\n"
+              << "  --Tp <godzina>  "
+              << "Godzina otwarcia urzedu (0-23), domyslnie 8\n"
+              << "  --Tk <godzina>  "
+              << "Godzina zamkniecia urzedu (0-23), domyslnie 16\n"
+              << "Argumenty urzednika:\n"
+              << "  --dept <SC|KM|ML|PD|SA>  "
+              << "Wydzial urzednika\n";
 }
 
 struct Config {
@@ -41,26 +42,30 @@ struct Config {
                     return std::nullopt;
                 }
                 config.role = *identity_opt;
-            } else if (arg == "--Tp" && i + 1 < argc) {
+            }
+            else if (arg == "--Tp" && i + 1 < argc) {
                 config.Tp = std::stoi(argv[++i]);
                 if (config.Tp < 0 || config.Tp > 23) {
                     std::cerr << "Blad: --Tp musi byc w zakresie 0-23\n";
                     return std::nullopt;
                 }
-            } else if (arg == "--Tk" && i + 1 < argc) {
+            }
+            else if (arg == "--Tk" && i + 1 < argc) {
                 config.Tk = std::stoi(argv[++i]);
                 if (config.Tk < 0 || config.Tk > 23) {
                     std::cerr << "Blad: --Tk musi byc w zakresie 0-23\n";
                     return std::nullopt;
                 }
-            } else if (arg == "--dept" && i + 1 < argc) {
+            }
+            else if (arg == "--dept" && i + 1 < argc) {
                 auto role_opt = string_to_urzednik_role(argv[++i]);
                 if (!role_opt) {
                     std::cerr << "Blad: Nieznany wydzial urzednika: " << argv[i] << "\n";
                     return std::nullopt;
                 }
                 config.urzednik_role = *role_opt;
-            } else {
+            }
+            else {
                 std::cerr << "Blad: Nieznany argument: " << arg << "\n";
                 return std::nullopt;
             }
@@ -106,6 +111,9 @@ int main(int argc, char* argv[]) {
             break;
         case Identity::Petent:
             petent_main();
+            break;
+        case Identity::Generator:
+            generator_main();
             break;
     }
 
