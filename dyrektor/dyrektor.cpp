@@ -139,7 +139,7 @@ int dyrektor_main(HoursOpen hours_open) {
     unsigned short queue_slots = capacity > 1 ? (capacity - 1) : 1;
     sem_vals[0] = queue_slots;
     sem_vals[1] = 1;
-    if (ipc::sem::set_all(sem_id, sem_vals, 2) == -1) {
+    if (ipc::sem::set_all(sem_id, sem_vals) == -1) {
         cleanup(shared_state, shm_id, msg_req_id, sem_id, lock_file);
         return 1;
     }

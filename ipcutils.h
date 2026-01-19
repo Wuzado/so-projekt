@@ -197,7 +197,7 @@ namespace ipc {
             return val;
         }
 
-        inline int set_all(int semid, unsigned short* values, int nsems) {
+        inline int set_all(int semid, unsigned short* values) {
             Semun arg{};
             arg.array = values;
             if (semctl(semid, 0, SETALL, arg) == -1) {
