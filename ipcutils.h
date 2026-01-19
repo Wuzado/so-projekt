@@ -6,6 +6,7 @@
 #include <pthread.h>
 #include <sys/ipc.h>
 #include <sys/msg.h>
+#include <sys/sem.h>
 #include <sys/shm.h>
 #include <sys/types.h>
 #include "common.h"
@@ -146,6 +147,94 @@ namespace ipc {
         }
 
     } // namespace msg
+
+    // Semaphores
+    namespace sem {
+
+        // POSIX.1 expects a semun union for semctl 
+        // See: man semctl(2)
+        union Semun {
+            int val;
+            struct semid_ds* buf;
+            unsigned short* array;
+        };
+
+        inline int create(key_t key, int nsems = 1, mode_t permissions = 0660) {
+            int semid = semget(key, nsems, IPC_CREAT | IPC_EXCL | permissions);
+            if (semid == -1) {
+                perror("semget failed");
+                return -1;
+            }
+            return semid;
+        }
+
+        inline int get(key_t key, int nsems = 1) {
+            int semid = semget(key, nsems, 0);
+            if (semid == -1) {
+                perror("semget failed");
+                return -1;
+            }
+            return semid;
+        }
+
+        inline int set_val(int semid, int sem_num, int value) {
+            Semun arg{};
+            arg.val = value;
+            if (semctl(semid, sem_num, SETVAL, arg) == -1) {
+                perror("semctl SETVAL failed");
+                return -1;
+            }
+            return 0;
+        }
+
+        inline int get_val(int semid, int sem_num) {
+            int val = semctl(semid, sem_num, GETVAL);
+            if (val == -1) {
+                perror("semctl GETVAL failed");
+                return -1;
+            }
+            return val;
+        }
+
+        inline int set_all(int semid, unsigned short* values, int nsems) {
+            Semun arg{};
+            arg.array = values;
+            if (semctl(semid, 0, SETALL, arg) == -1) {
+                perror("semctl SETALL failed");
+                return -1;
+            }
+            return 0;
+        }
+
+        inline int op(int semid, unsigned short sem_num, short sem_op, short sem_flg = 0) {
+            sembuf sb{};
+            sb.sem_num = sem_num;
+            sb.sem_op = sem_op;
+            sb.sem_flg = sem_flg;
+            if (semop(semid, &sb, 1) == -1) {
+                perror("semop failed");
+                return -1;
+            }
+            return 0;
+        }
+
+        inline int wait(int semid, unsigned short sem_num, short sem_flg = 0) {
+            return op(semid, sem_num, -1, sem_flg);
+        }
+
+        inline int post(int semid, unsigned short sem_num, short sem_flg = 0) {
+            return op(semid, sem_num, 1, sem_flg);
+        }
+
+        inline int remove(int semid) {
+            if (semctl(semid, 0, IPC_RMID) == -1) {
+                perror("semctl IPC_RMID failed");
+                return -1;
+            }
+            return 0;
+        }
+
+    } // namespace sem
 
     namespace thread {
         inline int create(pthread_t* thread, void* (*start_routine)(void*), void* arg,
