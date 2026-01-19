@@ -94,6 +94,11 @@ int rejestracja_main() {
             continue;
         }
 
+        if (request.petent_id == 0) {
+            Logger::log(LogSeverity::Notice, Identity::Rejestracja, "Otrzymano sygnal zakonczenia.");
+            break;
+        }
+
         if (shared_state->current_queue_length > 0) {
             shared_state->current_queue_length--;
         }

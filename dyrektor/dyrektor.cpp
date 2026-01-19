@@ -69,10 +69,20 @@ static void terminate_rejestracja(pid_t pid) {
     if (pid <= 0) {
         return;
     }
-    if (kill(pid, SIGUSR1) == -1) {
-        perror("kill failed");
-    }
     waitpid(pid, nullptr, 0);
+}
+
+static void send_rejestracja_shutdown(int msg_req_id, int count) {
+    if (msg_req_id == -1) {
+        return;
+    }
+    TicketRequestMsg shutdown_msg{};
+    shutdown_msg.petent_id = 0;
+    for (int i = 0; i < count; ++i) {
+        if (ipc::msg::send<TicketRequestMsg>(msg_req_id, 1, shutdown_msg) == -1) {
+            break;
+        }
+    }
 }
 
 int dyrektor_main(HoursOpen hours_open) {
@@ -179,6 +189,7 @@ int dyrektor_main(HoursOpen hours_open) {
         while (current > target) {
             pid_t pid = rejestracja_pids.back();
             rejestracja_pids.pop_back();
+            send_rejestracja_shutdown(msg_req_id, 1);
             terminate_rejestracja(pid);
             current = static_cast<short>(rejestracja_pids.size());
         }
@@ -193,6 +204,8 @@ int dyrektor_main(HoursOpen hours_open) {
     }
 
     stop_clock(clock_thread);
+
+    send_rejestracja_shutdown(msg_req_id, static_cast<int>(rejestracja_pids.size()));
 
     for (pid_t pid : rejestracja_pids) {
         terminate_rejestracja(pid);
