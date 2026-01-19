@@ -17,31 +17,6 @@ static void handle_shutdown_signal(int) { urzednik_running = 0; }
 
 static void handle_finish_signal(int) { stop_after_current = 1; }
 
-static ipc::KeyType role_to_key(UrzednikRole role) {
-    switch (role) {
-        case UrzednikRole::SA:
-            return ipc::KeyType::MsgQueueSA;
-        case UrzednikRole::SC:
-            return ipc::KeyType::MsgQueueSC;
-        case UrzednikRole::KM:
-            return ipc::KeyType::MsgQueueKM;
-        case UrzednikRole::ML:
-            return ipc::KeyType::MsgQueueML;
-        case UrzednikRole::PD:
-            return ipc::KeyType::MsgQueuePD;
-        default:
-            return ipc::KeyType::MsgQueueSA;
-    }
-}
-
-static int get_role_queue(UrzednikRole role) {
-    key_t key = ipc::make_key(role_to_key(role));
-    if (key == -1) {
-        return -1;
-    }
-    return ipc::msg::get(key);
-}
-
 static void short_work_delay() {
     int delay_ms = rng::random_int(5, 30);
     std::this_thread::sleep_for(std::chrono::minutes(delay_ms / TIME_MUL));
@@ -59,34 +34,18 @@ int urzednik_main(UrzednikRole role) {
 
     Logger::log(LogSeverity::Info, Identity::Urzednik, role, "Urzednik uruchomiony.");
 
-    key_t shm_key = ipc::make_key(ipc::KeyType::SharedState);
-    if (shm_key == -1) {
-        return 1;
-    }
-
-    int shm_id = ipc::shm::get<SharedState>(shm_key);
-    if (shm_id == -1) {
-        return 1;
-    }
-
-    auto shared_state = ipc::shm::attach<SharedState>(shm_id, false);
+    auto shared_state = ipc::helper::get_shared_state(false);
     if (!shared_state) {
         return 1;
     }
 
-    key_t sem_key = ipc::make_key(ipc::KeyType::SemaphoreSet);
-    if (sem_key == -1) {
-        ipc::shm::detach(shared_state);
-        return 1;
-    }
-
-    int sem_id = ipc::sem::get(sem_key, 2);
+    int sem_id = ipc::helper::get_semaphore_set(2);
     if (sem_id == -1) {
         ipc::shm::detach(shared_state);
         return 1;
     }
 
-    int msg_id = get_role_queue(role);
+    int msg_id = ipc::helper::get_role_queue(role);
     if (msg_id == -1) {
         ipc::shm::detach(shared_state);
         return 1;
@@ -123,7 +82,7 @@ int urzednik_main(UrzednikRole role) {
             int roll = rng::random_int(1, 100);
             if (roll <= 40) {
                 UrzednikRole target = get_rand_redirect();
-                int target_msg_id = get_role_queue(target);
+                int target_msg_id = ipc::helper::get_role_queue(target);
                 if (target_msg_id != -1) {
                     uint32_t ticket_number = 0;
                     if (ipc::sem::wait(sem_id, 1) == -1) {

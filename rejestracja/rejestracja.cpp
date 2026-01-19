@@ -42,40 +42,18 @@ int rejestracja_main() {
 
     Logger::log(LogSeverity::Info, Identity::Rejestracja, "Rejestracja uruchomiona.");
 
-    key_t shm_key = ipc::make_key(ipc::KeyType::SharedState);
-    if (shm_key == -1) {
-        return 1;
-    }
-
-    int shm_id = ipc::shm::get<SharedState>(shm_key);
-    if (shm_id == -1) {
-        return 1;
-    }
-
-    auto shared_state = ipc::shm::attach<SharedState>(shm_id, false);
+    auto shared_state = ipc::helper::get_shared_state(false);
     if (!shared_state) {
         return 1;
     }
 
-    key_t msg_req_key = ipc::make_key(ipc::KeyType::MsgQueueRejestracja);
-    if (msg_req_key == -1) {
-        ipc::shm::detach(shared_state);
-        return 1;
-    }
-
-    int msg_req_id = ipc::msg::get(msg_req_key);
+    int msg_req_id = ipc::helper::get_msg_queue(ipc::KeyType::MsgQueueRejestracja);
     if (msg_req_id == -1) {
         ipc::shm::detach(shared_state);
         return 1;
     }
 
-    key_t sem_key = ipc::make_key(ipc::KeyType::SemaphoreSet);
-    if (sem_key == -1) {
-        ipc::shm::detach(shared_state);
-        return 1;
-    }
-
-    int sem_id = ipc::sem::get(sem_key, 2);
+    int sem_id = ipc::helper::get_semaphore_set(2);
     if (sem_id == -1) {
         ipc::shm::detach(shared_state);
         return 1;

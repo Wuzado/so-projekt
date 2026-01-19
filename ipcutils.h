@@ -152,7 +152,7 @@ namespace ipc {
     // Semaphores
     namespace sem {
 
-        // POSIX.1 expects a semun union for semctl 
+        // POSIX.1 expects a semun union for semctl
         // See: man semctl(2)
         union Semun {
             int val;
@@ -223,9 +223,7 @@ namespace ipc {
             return op(semid, sem_num, -1, sem_flg);
         }
 
-        inline int post(int semid, unsigned short sem_num, short sem_flg = 0) {
-            return op(semid, sem_num, 1, sem_flg);
-        }
+        inline int post(int semid, unsigned short sem_num, short sem_flg = 0) { return op(semid, sem_num, 1, sem_flg); }
 
         inline int remove(int semid) {
             if (semctl(semid, 0, IPC_RMID) == -1) {
@@ -263,11 +261,72 @@ namespace ipc {
             return 0;
         }
 
-        inline void exit(void* retval = nullptr) {
-            pthread_exit(retval);
-        }
+        inline void exit(void* retval = nullptr) { pthread_exit(retval); }
 
     } // namespace thread
 } // namespace ipc
+
+namespace ipc::helper {
+    inline KeyType role_to_key(UrzednikRole role) {
+        switch (role) {
+            case UrzednikRole::SA:
+                return KeyType::MsgQueueSA;
+            case UrzednikRole::SC:
+                return KeyType::MsgQueueSC;
+            case UrzednikRole::KM:
+                return KeyType::MsgQueueKM;
+            case UrzednikRole::ML:
+                return KeyType::MsgQueueML;
+            case UrzednikRole::PD:
+                return KeyType::MsgQueuePD;
+            default:
+                return KeyType::MsgQueueSA;
+        }
+    }
+
+    inline int get_role_queue(UrzednikRole role) {
+        key_t key = make_key(role_to_key(role));
+        if (key == -1) {
+            return -1;
+        }
+        return msg::get(key);
+    }
+
+    inline SharedState* get_shared_state(bool readonly, int* shm_id_out = nullptr) {
+        key_t key = make_key(KeyType::SharedState);
+        if (key == -1) {
+            return nullptr;
+        }
+        int shm_id = shm::get<SharedState>(key);
+        if (shm_id == -1) {
+            return nullptr;
+        }
+        auto shared_state = shm::attach<SharedState>(shm_id, readonly);
+        if (!shared_state) {
+            return nullptr;
+        }
+        if (shm_id_out != nullptr) {
+            *shm_id_out = shm_id;
+        }
+        return shared_state;
+    }
+
+    inline int get_semaphore_set(int nsems = 2) {
+        key_t key = make_key(KeyType::SemaphoreSet);
+        if (key == -1) {
+            return -1;
+        }
+        return sem::get(key, nsems);
+    }
+
+    inline int get_msg_queue(KeyType type) {
+        key_t key = make_key(type);
+        if (key == -1) {
+            return -1;
+        }
+        return msg::get(key);
+    }
+} // namespace ipc::helper
+
 
 #endif // SO_PROJEKT_IPCUTILS_H

@@ -50,17 +50,7 @@ int generator_main() {
 
     Logger::log(LogSeverity::Info, Identity::Generator, "Generator petentow uruchomiony.");
 
-    key_t shm_key = ipc::make_key(ipc::KeyType::SharedState);
-    if (shm_key == -1) {
-        return 1;
-    }
-
-    int shm_id = ipc::shm::get<SharedState>(shm_key);
-    if (shm_id == -1) {
-        return 1;
-    }
-
-    auto shared_state = ipc::shm::attach<SharedState>(shm_id, true);
+    auto shared_state = ipc::helper::get_shared_state(true);
     if (!shared_state) {
         return 1;
     }

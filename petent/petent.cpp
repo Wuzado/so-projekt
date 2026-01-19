@@ -13,31 +13,6 @@ static volatile sig_atomic_t petent_evacuating = 0;
 
 static void handle_evacuation_signal(int) { petent_evacuating = 1; }
 
-static ipc::KeyType role_to_key(UrzednikRole role) {
-    switch (role) {
-        case UrzednikRole::SA:
-            return ipc::KeyType::MsgQueueSA;
-        case UrzednikRole::SC:
-            return ipc::KeyType::MsgQueueSC;
-        case UrzednikRole::KM:
-            return ipc::KeyType::MsgQueueKM;
-        case UrzednikRole::ML:
-            return ipc::KeyType::MsgQueueML;
-        case UrzednikRole::PD:
-            return ipc::KeyType::MsgQueuePD;
-        default:
-            return ipc::KeyType::MsgQueueSA;
-    }
-}
-
-static int get_role_queue(UrzednikRole role) {
-    key_t key = ipc::make_key(role_to_key(role));
-    if (key == -1) {
-        return -1;
-    }
-    return ipc::msg::get(key);
-}
-
 static void log_evacuation() {
     Logger::log(LogSeverity::Notice, Identity::Petent, "Ewakuacja - petent opuszcza budynek.");
 }
@@ -49,40 +24,18 @@ int petent_main() {
 
     Logger::log(LogSeverity::Info, Identity::Petent, "Petent uruchomiony.");
 
-    key_t shm_key = ipc::make_key(ipc::KeyType::SharedState);
-    if (shm_key == -1) {
-        return 1;
-    }
-
-    int shm_id = ipc::shm::get<SharedState>(shm_key);
-    if (shm_id == -1) {
-        return 1;
-    }
-
-    auto shared_state = ipc::shm::attach<SharedState>(shm_id, false);
+    auto shared_state = ipc::helper::get_shared_state(false);
     if (!shared_state) {
         return 1;
     }
 
-    key_t sem_key = ipc::make_key(ipc::KeyType::SemaphoreSet);
-    if (sem_key == -1) {
-        ipc::shm::detach(shared_state);
-        return 1;
-    }
-
-    int sem_id = ipc::sem::get(sem_key, 2);
+    int sem_id = ipc::helper::get_semaphore_set(2);
     if (sem_id == -1) {
         ipc::shm::detach(shared_state);
         return 1;
     }
 
-    key_t msg_req_key = ipc::make_key(ipc::KeyType::MsgQueueRejestracja);
-    if (msg_req_key == -1) {
-        ipc::shm::detach(shared_state);
-        return 1;
-    }
-
-    int msg_req_id = ipc::msg::get(msg_req_key);
+    int msg_req_id = ipc::helper::get_msg_queue(ipc::KeyType::MsgQueueRejestracja);
     if (msg_req_id == -1) {
         ipc::shm::detach(shared_state);
         return 1;
@@ -168,7 +121,7 @@ int petent_main() {
         return 0;
     }
 
-    int dept_msg_id = get_role_queue(issued.department);
+    int dept_msg_id = ipc::helper::get_role_queue(issued.department);
     if (dept_msg_id == -1) {
         Logger::log(LogSeverity::Err, Identity::Petent, "Nie znaleziono kolejki urzednika.");
         ipc::shm::detach(shared_state);
