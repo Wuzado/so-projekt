@@ -18,6 +18,7 @@ namespace ipc {
     enum class KeyType : int {
         SharedState = 'S',
         SemaphoreSet = 'M',
+        MsgQueueRejestracja = 'R',
         MsgQueueSA = 'A',
         MsgQueueSC = 'C',
         MsgQueueKM = 'K',

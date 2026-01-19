@@ -37,15 +37,17 @@ inline std::optional<UrzednikRole> string_to_urzednik_role(std::string_view str)
 enum class OfficeStatus { Open, Closed };
 
 struct SharedState {
-    unsigned int day;
-    unsigned int building_capacity; // N
-    unsigned int current_queue_length;
-    short ticket_machines_num;
-    unsigned int simulated_time; // Essentially ticks (which can be affected by TIME_MUL)
+    uint32_t day;
+    uint32_t building_capacity; // N
+    uint32_t current_queue_length;
+    uint8_t ticket_machines_num;
+    uint32_t ticket_counters[5];
+    uint32_t simulated_time; // Essentially ticks (which can be affected by TIME_MUL)
     OfficeStatus office_status;
 
-    SharedState(unsigned int capacity) :
+    SharedState(uint32_t capacity) :
         day(0), building_capacity(capacity), current_queue_length(0), ticket_machines_num(1),
+        ticket_counters{0, 0, 0, 0, 0},
         simulated_time(0), office_status(OfficeStatus::Closed) {}
 };
 
