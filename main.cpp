@@ -4,6 +4,7 @@
 #include "logger.h"
 #include "dyrektor/dyrektor.h"
 #include "rejestracja/rejestracja.h"
+#include "urzednik/urzednik.h"
 
 void print_usage(char* program_name) {
     std::cerr << "Uzycie: " << program_name << " <argumenty>\n\n"
@@ -14,13 +15,17 @@ void print_usage(char* program_name) {
     << "  --Tp <godzina>  "
     << "Godzina otwarcia urzedu (0-23), domyslnie 8\n"
     << "  --Tk <godzina>  "
-    << "Godzina zamkniecia urzedu (0-23), domyslnie 16\n";
+    << "Godzina zamkniecia urzedu (0-23), domyslnie 16\n"
+    << "Argumenty urzednika:\n"
+    << "  --dept <SC|KM|ML|PD|SA>  "
+    << "Wydzial urzednika\n";
 }
 
 struct Config {
     Identity role = Identity::Dyrektor;
     int Tp = 8;
     int Tk = 16;
+    std::optional<UrzednikRole> urzednik_role;
 
     static std::optional<Config> parse_arguments(int argc, char* argv[]) {
         Config config;
@@ -47,6 +52,13 @@ struct Config {
                     std::cerr << "Blad: --Tk musi byc w zakresie 0-23\n";
                     return std::nullopt;
                 }
+            } else if (arg == "--dept" && i + 1 < argc) {
+                auto role_opt = string_to_urzednik_role(argv[++i]);
+                if (!role_opt) {
+                    std::cerr << "Blad: Nieznany wydzial urzednika: " << argv[i] << "\n";
+                    return std::nullopt;
+                }
+                config.urzednik_role = *role_opt;
             } else {
                 std::cerr << "Blad: Nieznany argument: " << arg << "\n";
                 return std::nullopt;
@@ -85,7 +97,11 @@ int main(int argc, char* argv[]) {
             rejestracja_main();
             break;
         case Identity::Urzednik:
-            Logger::log(LogSeverity::Notice, Identity::Urzednik, "Brak implementacji urzednika.");
+            if (!config->urzednik_role) {
+                Logger::log(LogSeverity::Err, Identity::Urzednik, "Brak parametru --dept.");
+                return 1;
+            }
+            urzednik_main(*config->urzednik_role);
             break;
         case Identity::Petent:
             Logger::log(LogSeverity::Notice, Identity::Petent, "Brak implementacji petenta.");
