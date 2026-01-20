@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <cstdio>
+#include <cerrno>
 #include <pthread.h>
 #include <sys/ipc.h>
 #include <sys/msg.h>
@@ -234,6 +235,88 @@ namespace ipc {
         }
 
     } // namespace sem
+
+    namespace mutex {
+        inline int init(pthread_mutex_t* mutex, bool process_shared = false) {
+            pthread_mutexattr_t attr;
+            int rc = pthread_mutexattr_init(&attr);
+            if (rc != 0) {
+                errno = rc;
+                perror("pthread_mutexattr_init failed");
+                return -1;
+            }
+
+            if (process_shared) {
+                rc = pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
+                if (rc != 0) {
+                    errno = rc;
+                    perror("pthread_mutexattr_setpshared failed");
+                    pthread_mutexattr_destroy(&attr);
+                    return -1;
+                }
+            }
+
+            rc = pthread_mutex_init(mutex, &attr);
+            if (rc != 0) {
+                errno = rc;
+                perror("pthread_mutex_init failed");
+                pthread_mutexattr_destroy(&attr);
+                return -1;
+            }
+
+            rc = pthread_mutexattr_destroy(&attr);
+            if (rc != 0) {
+                errno = rc;
+                perror("pthread_mutexattr_destroy failed");
+                return -1;
+            }
+
+            return 0;
+        }
+
+        inline int lock(pthread_mutex_t* mutex) {
+            int rc = pthread_mutex_lock(mutex);
+            if (rc != 0) {
+                errno = rc;
+                perror("pthread_mutex_lock failed");
+                return -1;
+            }
+            return 0;
+        }
+
+        inline int trylock(pthread_mutex_t* mutex) {
+            int rc = pthread_mutex_trylock(mutex);
+            if (rc == EBUSY) {
+                return 1;
+            }
+            if (rc != 0) {
+                errno = rc;
+                perror("pthread_mutex_trylock failed");
+                return -1;
+            }
+            return 0;
+        }
+
+        inline int unlock(pthread_mutex_t* mutex) {
+            int rc = pthread_mutex_unlock(mutex);
+            if (rc != 0) {
+                errno = rc;
+                perror("pthread_mutex_unlock failed");
+                return -1;
+            }
+            return 0;
+        }
+
+        inline int destroy(pthread_mutex_t* mutex) {
+            int rc = pthread_mutex_destroy(mutex);
+            if (rc != 0) {
+                errno = rc;
+                perror("pthread_mutex_destroy failed");
+                return -1;
+            }
+            return 0;
+        }
+    } // namespace mutex
 
     namespace thread {
         inline int create(pthread_t* thread, void* (*start_routine)(void*), void* arg,
