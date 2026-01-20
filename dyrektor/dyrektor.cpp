@@ -1,21 +1,21 @@
 #include "dyrektor.h"
+#include <cerrno>
 #include <chrono>
 #include <csignal>
 #include <cstring>
 #include <fcntl.h>
 #include <pthread.h>
+#include <sys/wait.h>
 #include <thread>
 #include <unistd.h>
-#include <sys/wait.h>
 #include <vector>
 #include "../common.h"
 #include "../ipcutils.h"
 #include "../logger.h"
 #include "clock.h"
+#include "process.h"
 
-static void handle_shutdown_signal(int) {
-    simulation_running = false;
-}
+static void handle_shutdown_signal(int) { simulation_running = false; }
 
 void cleanup(SharedState* shared_state, int shm_id, int msg_req_id, int msg_sa_id, int msg_sc_id, int msg_km_id,
              int msg_ml_id, int msg_pd_id, int sem_id, int lock_file) {
@@ -67,100 +67,8 @@ static short desired_ticket_machines(const SharedState* shared_state) {
     return 1;
 }
 
-static pid_t spawn_rejestracja() {
-    pid_t pid = fork();
-    if (pid == -1) {
-        perror("fork failed");
-        return -1;
-    }
-    if (pid == 0) {
-        execl("/proc/self/exe", "so_projekt", "--role", "rejestracja", static_cast<char*>(nullptr));
-        perror("exec failed");
-        _exit(1);
-    }
-    return pid;
-}
-
-static void terminate_rejestracja(pid_t pid) {
-    if (pid <= 0) {
-        return;
-    }
-    waitpid(pid, nullptr, 0);
-}
-
-static pid_t spawn_urzednik(UrzednikRole role) {
-    pid_t pid = fork();
-    if (pid == -1) {
-        perror("fork failed");
-        return -1;
-    }
-    if (pid == 0) {
-        const char* dept = "SA";
-        switch (role) {
-            case UrzednikRole::SA:
-                dept = "SA";
-                break;
-            case UrzednikRole::SC:
-                dept = "SC";
-                break;
-            case UrzednikRole::KM:
-                dept = "KM";
-                break;
-            case UrzednikRole::ML:
-                dept = "ML";
-                break;
-            case UrzednikRole::PD:
-                dept = "PD";
-                break;
-        }
-        execl("/proc/self/exe", "so_projekt", "--role", "urzednik", "--dept", dept,
-              static_cast<char*>(nullptr));
-        perror("exec failed");
-        _exit(1);
-    }
-    return pid;
-}
-
-static void terminate_urzednik(pid_t pid) {
-    if (pid <= 0) {
-        return;
-    }
-    waitpid(pid, nullptr, 0);
-}
-
-struct UrzednikProcess {
-    pid_t pid;
-    UrzednikRole role;
-};
-
-static void send_rejestracja_shutdown(int msg_req_id, int count) {
-    if (msg_req_id == -1) {
-        return;
-    }
-    TicketRequestMsg shutdown_msg{};
-    shutdown_msg.petent_id = 0;
-    for (int i = 0; i < count; ++i) {
-        if (ipc::msg::send<TicketRequestMsg>(msg_req_id, 1, shutdown_msg) == -1) {
-            break;
-        }
-    }
-}
-
-static void send_urzednik_shutdown(int msg_id, UrzednikRole role, int count) {
-    if (msg_id == -1) {
-        return;
-    }
-    TicketIssuedMsg shutdown_msg{};
-    shutdown_msg.petent_id = 0;
-    shutdown_msg.ticket_number = 0;
-    shutdown_msg.department = role;
-    shutdown_msg.redirected_from_sa = 0;
-    for (int i = 0; i < count; ++i) {
-        if (ipc::msg::send<TicketIssuedMsg>(msg_id, 1, shutdown_msg) == -1) {
-            break;
-        }
-    }
-}
+using process::UrzednikProcess;
+using process::UrzednikQueue;
 
 int dyrektor_main(HoursOpen hours_open) {
     std::signal(SIGINT, handle_shutdown_signal);
@@ -229,6 +137,11 @@ int dyrektor_main(HoursOpen hours_open) {
         return 1;
     }
 
+    const std::vector<UrzednikQueue> urzednik_queues = {
+        {msg_sa_id, UrzednikRole::SA, 2}, {msg_sc_id, UrzednikRole::SC, 1}, {msg_km_id, UrzednikRole::KM, 1},
+        {msg_ml_id, UrzednikRole::ML, 1}, {msg_pd_id, UrzednikRole::PD, 1},
+    };
+
     key_t sem_key = ipc::make_key(ipc::KeyType::SemaphoreSet);
     if (sem_key == -1) {
         cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, -1, lock_file);
@@ -247,79 +160,72 @@ int dyrektor_main(HoursOpen hours_open) {
     sem_vals[0] = queue_slots;
     sem_vals[1] = 1;
     if (ipc::sem::set_all(sem_id, sem_vals) == -1) {
-        cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, sem_id, lock_file);
+        cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, sem_id,
+                lock_file);
         return 1;
     }
 
     pthread_t clock_thread{};
     if (start_clock(shared_state, hours_open, &clock_thread) != 0) {
-        cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, sem_id, lock_file);
+        cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, sem_id,
+                lock_file);
         return 1;
     }
 
     std::vector<UrzednikProcess> urzednik_pids;
-    urzednik_pids.reserve(6);
-    pid_t sa1 = spawn_urzednik(UrzednikRole::SA);
-    pid_t sa2 = spawn_urzednik(UrzednikRole::SA);
-    pid_t sc = spawn_urzednik(UrzednikRole::SC);
-    pid_t km = spawn_urzednik(UrzednikRole::KM);
-    pid_t ml = spawn_urzednik(UrzednikRole::ML);
-    pid_t pd = spawn_urzednik(UrzednikRole::PD);
-    if (sa1 == -1 || sa2 == -1 || sc == -1 || km == -1 || ml == -1 || pd == -1) {
+    if (!process::spawn_urzednicy(urzednik_pids)) {
         stop_clock(clock_thread);
-        int sa_count = (sa1 > 0 ? 1 : 0) + (sa2 > 0 ? 1 : 0);
-        int sc_count = sc > 0 ? 1 : 0;
-        int km_count = km > 0 ? 1 : 0;
-        int ml_count = ml > 0 ? 1 : 0;
-        int pd_count = pd > 0 ? 1 : 0;
-        send_urzednik_shutdown(msg_sa_id, UrzednikRole::SA, sa_count);
-        send_urzednik_shutdown(msg_sc_id, UrzednikRole::SC, sc_count);
-        send_urzednik_shutdown(msg_km_id, UrzednikRole::KM, km_count);
-        send_urzednik_shutdown(msg_ml_id, UrzednikRole::ML, ml_count);
-        send_urzednik_shutdown(msg_pd_id, UrzednikRole::PD, pd_count);
-        if (sa1 > 0) waitpid(sa1, nullptr, 0);
-        if (sa2 > 0) waitpid(sa2, nullptr, 0);
-        if (sc > 0) waitpid(sc, nullptr, 0);
-        if (km > 0) waitpid(km, nullptr, 0);
-        if (ml > 0) waitpid(ml, nullptr, 0);
-        if (pd > 0) waitpid(pd, nullptr, 0);
-        cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, sem_id, lock_file);
+        cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, sem_id,
+                lock_file);
         return 1;
     }
-    urzednik_pids.push_back({sa1, UrzednikRole::SA});
-    urzednik_pids.push_back({sa2, UrzednikRole::SA});
-    urzednik_pids.push_back({sc, UrzednikRole::SC});
-    urzednik_pids.push_back({km, UrzednikRole::KM});
-    urzednik_pids.push_back({ml, UrzednikRole::ML});
-    urzednik_pids.push_back({pd, UrzednikRole::PD});
-
     std::vector<pid_t> rejestracja_pids;
-    rejestracja_pids.reserve(3);
-
-    pid_t first_pid = spawn_rejestracja();
-    if (first_pid == -1) {
+    if (!process::spawn_rejestracja_group(rejestracja_pids)) {
         stop_clock(clock_thread);
-        send_urzednik_shutdown(msg_sa_id, UrzednikRole::SA, 2);
-        send_urzednik_shutdown(msg_sc_id, UrzednikRole::SC, 1);
-        send_urzednik_shutdown(msg_km_id, UrzednikRole::KM, 1);
-        send_urzednik_shutdown(msg_ml_id, UrzednikRole::ML, 1);
-        send_urzednik_shutdown(msg_pd_id, UrzednikRole::PD, 1);
-        for (const auto& proc : urzednik_pids) {
-            terminate_urzednik(proc.pid);
-        }
-        cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, sem_id, lock_file);
+        process::send_urzednik_shutdowns(urzednik_queues);
+        process::terminate_urzednik_all(urzednik_pids);
+        cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, sem_id,
+                lock_file);
         return 1;
     }
-    rejestracja_pids.push_back(first_pid);
     shared_state->ticket_machines_num = 1;
+
+    uint32_t last_day = shared_state->day;
 
     // Main dyrektor loop
     while (simulation_running.load()) {
+        if (shared_state->day != last_day) {
+            Logger::log(LogSeverity::Notice, Identity::Dyrektor, "Restart dzienny urzednikow i rejestracji.");
+
+            process::stop_daily_rejestracja(rejestracja_pids);
+            process::stop_daily_urzednik(urzednik_pids);
+
+            shared_state->current_queue_length = 0;
+            for (auto& counter : shared_state->ticket_counters) {
+                counter = 0;
+            }
+
+            if (!process::spawn_urzednicy(urzednik_pids)) {
+                Logger::log(LogSeverity::Emerg, Identity::Dyrektor, "Nie udalo sie odtworzyc urzednikow po dniu.");
+                simulation_running = false;
+                break;
+            }
+            if (!process::spawn_rejestracja_group(rejestracja_pids)) {
+                Logger::log(LogSeverity::Emerg, Identity::Dyrektor, "Nie udalo sie odtworzyc rejestracji po dniu.");
+                process::terminate_urzednik_all(urzednik_pids);
+                simulation_running = false;
+                break;
+            }
+
+            shared_state->ticket_machines_num = static_cast<uint8_t>(rejestracja_pids.size());
+            last_day = shared_state->day;
+        }
+
         short target = desired_ticket_machines(shared_state);
         auto current = static_cast<short>(rejestracja_pids.size());
 
         while (current < target) {
-            pid_t pid = spawn_rejestracja();
+            pid_t pid = process::spawn_rejestracja();
             if (pid == -1) {
                 break;
             }
@@ -330,8 +236,8 @@ int dyrektor_main(HoursOpen hours_open) {
         while (current > target) {
             pid_t pid = rejestracja_pids.back();
             rejestracja_pids.pop_back();
-            send_rejestracja_shutdown(msg_req_id, 1);
-            terminate_rejestracja(pid);
+            process::send_rejestracja_shutdown(msg_req_id, 1);
+            process::terminate_rejestracja(pid);
             current = static_cast<short>(rejestracja_pids.size());
         }
 
@@ -346,20 +252,11 @@ int dyrektor_main(HoursOpen hours_open) {
 
     stop_clock(clock_thread);
 
-    send_rejestracja_shutdown(msg_req_id, static_cast<int>(rejestracja_pids.size()));
-    send_urzednik_shutdown(msg_sa_id, UrzednikRole::SA, 2);
-    send_urzednik_shutdown(msg_sc_id, UrzednikRole::SC, 1);
-    send_urzednik_shutdown(msg_km_id, UrzednikRole::KM, 1);
-    send_urzednik_shutdown(msg_ml_id, UrzednikRole::ML, 1);
-    send_urzednik_shutdown(msg_pd_id, UrzednikRole::PD, 1);
+    process::send_rejestracja_shutdown(msg_req_id, static_cast<int>(rejestracja_pids.size()));
+    process::send_urzednik_shutdowns(urzednik_queues);
 
-    for (pid_t pid : rejestracja_pids) {
-        terminate_rejestracja(pid);
-    }
-
-    for (const auto& proc : urzednik_pids) {
-        terminate_urzednik(proc.pid);
-    }
+    process::terminate_rejestracja_all(rejestracja_pids);
+    process::terminate_urzednik_all(urzednik_pids);
 
     cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, sem_id, lock_file);
     return 0;
