@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <cerrno>
+#include <ctime>
 #include <pthread.h>
 #include <sys/ipc.h>
 #include <sys/msg.h>
@@ -317,6 +318,98 @@ namespace ipc {
             return 0;
         }
     } // namespace mutex
+
+    namespace cond {
+        inline int init(pthread_cond_t* cond, bool process_shared = false) {
+            pthread_condattr_t attr;
+            int rc = pthread_condattr_init(&attr);
+            if (rc != 0) {
+                errno = rc;
+                perror("pthread_condattr_init failed");
+                return -1;
+            }
+
+            if (process_shared) {
+                rc = pthread_condattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
+                if (rc != 0) {
+                    errno = rc;
+                    perror("pthread_condattr_setpshared failed");
+                    pthread_condattr_destroy(&attr);
+                    return -1;
+                }
+            }
+
+            rc = pthread_cond_init(cond, &attr);
+            if (rc != 0) {
+                errno = rc;
+                perror("pthread_cond_init failed");
+                pthread_condattr_destroy(&attr);
+                return -1;
+            }
+
+            rc = pthread_condattr_destroy(&attr);
+            if (rc != 0) {
+                errno = rc;
+                perror("pthread_condattr_destroy failed");
+                return -1;
+            }
+
+            return 0;
+        }
+
+        inline int wait(pthread_cond_t* cond, pthread_mutex_t* mutex) {
+            int rc = pthread_cond_wait(cond, mutex);
+            if (rc != 0) {
+                errno = rc;
+                perror("pthread_cond_wait failed");
+                return -1;
+            }
+            return 0;
+        }
+
+        inline int timedwait(pthread_cond_t* cond, pthread_mutex_t* mutex, const timespec* abs_timeout) {
+            int rc = pthread_cond_timedwait(cond, mutex, abs_timeout);
+            if (rc == ETIMEDOUT) {
+                return 1;
+            }
+            if (rc != 0) {
+                errno = rc;
+                perror("pthread_cond_timedwait failed");
+                return -1;
+            }
+            return 0;
+        }
+
+        inline int signal(pthread_cond_t* cond) {
+            int rc = pthread_cond_signal(cond);
+            if (rc != 0) {
+                errno = rc;
+                perror("pthread_cond_signal failed");
+                return -1;
+            }
+            return 0;
+        }
+
+        inline int broadcast(pthread_cond_t* cond) {
+            int rc = pthread_cond_broadcast(cond);
+            if (rc != 0) {
+                errno = rc;
+                perror("pthread_cond_broadcast failed");
+                return -1;
+            }
+            return 0;
+        }
+
+        inline int destroy(pthread_cond_t* cond) {
+            int rc = pthread_cond_destroy(cond);
+            if (rc != 0) {
+                errno = rc;
+                perror("pthread_cond_destroy failed");
+                return -1;
+            }
+            return 0;
+        }
+    } // namespace cond
 
     namespace thread {
         inline int create(pthread_t* thread, void* (*start_routine)(void*), void* arg,
