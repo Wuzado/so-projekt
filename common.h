@@ -35,6 +35,15 @@ inline std::optional<UrzednikRole> string_to_urzednik_role(std::string_view str)
     return std::nullopt;
 }
 
+inline std::optional<std::string_view> urzednik_role_to_string(UrzednikRole role) {
+    if (role == UrzednikRole::SC) return "SC";
+    if (role == UrzednikRole::KM) return "KM";
+    if (role == UrzednikRole::ML) return "ML";
+    if (role == UrzednikRole::PD) return "PD";
+    if (role == UrzednikRole::SA) return "SA";
+    return std::nullopt;
+}
+
 enum class OfficeStatus { Open, Closed };
 
 struct SharedState {
