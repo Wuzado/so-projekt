@@ -165,23 +165,14 @@ int dyrektor_main(HoursOpen hours_open) {
         return 1;
     }
 
-    pthread_t clock_thread{};
-    if (start_clock(shared_state, hours_open, &clock_thread) != 0) {
-        cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, sem_id,
-                lock_file);
-        return 1;
-    }
-
     std::vector<UrzednikProcess> urzednik_pids;
     if (!process::spawn_urzednicy(urzednik_pids)) {
-        stop_clock(clock_thread);
         cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, sem_id,
                 lock_file);
         return 1;
     }
     std::vector<pid_t> rejestracja_pids;
     if (!process::spawn_rejestracja_group(rejestracja_pids)) {
-        stop_clock(clock_thread);
         process::send_urzednik_shutdowns(urzednik_queues);
         process::terminate_urzednik_all(urzednik_pids);
         cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, sem_id,
@@ -189,6 +180,17 @@ int dyrektor_main(HoursOpen hours_open) {
         return 1;
     }
     shared_state->ticket_machines_num = 1;
+
+    pthread_t clock_thread{};
+    if (start_clock(shared_state, hours_open, &clock_thread) != 0) {
+        process::send_rejestracja_shutdown(msg_req_id, static_cast<int>(rejestracja_pids.size()));
+        process::send_urzednik_shutdowns(urzednik_queues);
+        process::terminate_rejestracja_all(rejestracja_pids);
+        process::terminate_urzednik_all(urzednik_pids);
+        cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, sem_id,
+                lock_file);
+        return 1;
+    }
 
     uint32_t last_day = shared_state->day;
 
@@ -218,6 +220,7 @@ int dyrektor_main(HoursOpen hours_open) {
             }
 
             shared_state->ticket_machines_num = static_cast<uint8_t>(rejestracja_pids.size());
+            notify_day_restart_complete();
             last_day = shared_state->day;
         }
 
