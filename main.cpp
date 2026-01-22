@@ -1,3 +1,4 @@
+#include <array>
 #include <iostream>
 #include <optional>
 #include "common.h"
@@ -18,6 +19,16 @@ void print_usage(char* program_name) {
               << "Godzina otwarcia urzedu (0-23), domyslnie 8\n"
               << "  --Tk <godzina>  "
               << "Godzina zamkniecia urzedu (0-23), domyslnie 16\n"
+              << "  --X1 <limit>    "
+              << "Limit przyjec dla urzednikow SA (na urzednika), domyslnie 20\n"
+              << "  --X2 <limit>    "
+              << "Limit przyjec dla urzednika SC, domyslnie 10\n"
+              << "  --X3 <limit>    "
+              << "Limit przyjec dla urzednika KM, domyslnie 10\n"
+              << "  --X4 <limit>    "
+              << "Limit przyjec dla urzednika ML, domyslnie 10\n"
+              << "  --X5 <limit>    "
+              << "Limit przyjec dla urzednika PD, domyslnie 10\n"
               << "Argumenty urzednika:\n"
               << "  --dept <SC|KM|ML|PD|SA>  "
               << "Wydzial urzednika\n";
@@ -27,6 +38,11 @@ struct Config {
     Identity role = Identity::Dyrektor;
     int Tp = 8;
     int Tk = 16;
+    int X1 = 20;
+    int X2 = 10;
+    int X3 = 10;
+    int X4 = 10;
+    int X5 = 10;
     std::optional<UrzednikRole> urzednik_role;
 
     static std::optional<Config> parse_arguments(int argc, char* argv[]) {
@@ -54,6 +70,41 @@ struct Config {
                 config.Tk = std::stoi(argv[++i]);
                 if (config.Tk < 0 || config.Tk > 23) {
                     std::cerr << "Blad: --Tk musi byc w zakresie 0-23\n";
+                    return std::nullopt;
+                }
+            }
+            else if (arg == "--X1" && i + 1 < argc) {
+                config.X1 = std::stoi(argv[++i]);
+                if (config.X1 < 0) {
+                    std::cerr << "Blad: --X1 musi byc >= 0\n";
+                    return std::nullopt;
+                }
+            }
+            else if (arg == "--X2" && i + 1 < argc) {
+                config.X2 = std::stoi(argv[++i]);
+                if (config.X2 < 0) {
+                    std::cerr << "Blad: --X2 musi byc >= 0\n";
+                    return std::nullopt;
+                }
+            }
+            else if (arg == "--X3" && i + 1 < argc) {
+                config.X3 = std::stoi(argv[++i]);
+                if (config.X3 < 0) {
+                    std::cerr << "Blad: --X3 musi byc >= 0\n";
+                    return std::nullopt;
+                }
+            }
+            else if (arg == "--X4" && i + 1 < argc) {
+                config.X4 = std::stoi(argv[++i]);
+                if (config.X4 < 0) {
+                    std::cerr << "Blad: --X4 musi byc >= 0\n";
+                    return std::nullopt;
+                }
+            }
+            else if (arg == "--X5" && i + 1 < argc) {
+                config.X5 = std::stoi(argv[++i]);
+                if (config.X5 < 0) {
+                    std::cerr << "Blad: --X5 musi byc >= 0\n";
                     return std::nullopt;
                 }
             }
@@ -92,13 +143,27 @@ int main(int argc, char* argv[]) {
 
     Logger::log(LogSeverity::Debug, config->role, "Config:" 
         " Tp=" + std::to_string(config->Tp) +
-        " Tk=" + std::to_string(config->Tk)
+        " Tk=" + std::to_string(config->Tk) +
+        " X1=" + std::to_string(config->X1) +
+        " X2=" + std::to_string(config->X2) +
+        " X3=" + std::to_string(config->X3) +
+        " X4=" + std::to_string(config->X4) +
+        " X5=" + std::to_string(config->X5)
     );
 
     switch (config->role) {
         case Identity::Dyrektor:
-            dyrektor_main({config->Tp, config->Tk});
+        {
+            std::array<uint32_t, 5> limits = {
+                static_cast<uint32_t>(config->X2),
+                static_cast<uint32_t>(config->X3),
+                static_cast<uint32_t>(config->X4),
+                static_cast<uint32_t>(config->X5),
+                static_cast<uint32_t>(config->X1) * 2u
+            };
+            dyrektor_main({config->Tp, config->Tk}, limits);
             break;
+        }
         case Identity::Rejestracja:
             rejestracja_main();
             break;

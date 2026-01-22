@@ -91,6 +91,7 @@ int rejestracja_main() {
             rejected.ticket_number = 0;
             rejected.department = UrzednikRole::SA;
             rejected.redirected_from_sa = 0;
+            rejected.reject_reason = TicketRejectReason::OfficeClosed;
             if (ipc::msg::send<TicketIssuedMsg>(msg_req_id, static_cast<long>(request.petent_id), rejected) == -1) {
                 std::string error =
                     "Blad zwrotu informacji o zamknietym urzedzie dla petenta " + std::to_string(request.petent_id);
@@ -103,13 +104,40 @@ int rejestracja_main() {
         UrzednikRole department = choose_department();
         int idx = static_cast<int>(department);
         uint32_t ticket_number = 0;
+        TicketRejectReason reject_reason = TicketRejectReason::None;
         if (ipc::sem::wait(sem_id, 1) == -1) {
             Logger::log(LogSeverity::Err, Identity::Rejestracja, "Blad blokady licznika biletow.");
             continue;
         }
-        ticket_number = ++shared_state->ticket_counters[idx];
+        uint32_t limit = shared_state->ticket_limits[idx];
+        uint32_t current = shared_state->ticket_counters[idx];
+        if (limit != 0 && current >= limit) {
+            reject_reason = TicketRejectReason::LimitReached;
+        }
+        else {
+            ticket_number = ++shared_state->ticket_counters[idx];
+        }
         if (ipc::sem::post(sem_id, 1) == -1) {
             Logger::log(LogSeverity::Err, Identity::Rejestracja, "Blad odblokowania licznika biletow.");
+        }
+
+        if (reject_reason != TicketRejectReason::None) {
+            TicketIssuedMsg rejected{};
+            rejected.petent_id = request.petent_id;
+            rejected.ticket_number = 0;
+            rejected.department = department;
+            rejected.redirected_from_sa = 0;
+            rejected.reject_reason = reject_reason;
+            if (ipc::msg::send<TicketIssuedMsg>(msg_req_id, static_cast<long>(request.petent_id), rejected) == -1) {
+                std::string error =
+                    "Blad zwrotu informacji o braku limitu dla petenta " + std::to_string(request.petent_id);
+                Logger::log(LogSeverity::Err, Identity::Rejestracja, error);
+            }
+            auto dept_name = urzednik_role_to_string(department);
+            std::string dept = dept_name ? std::string(*dept_name) : std::string("?");
+            Logger::log(LogSeverity::Notice, Identity::Rejestracja,
+                        "Brak wolnych terminow w wydziale " + dept + ", bilet nie zostal wydany.");
+            continue;
         }
 
         TicketIssuedMsg issued{};
@@ -117,6 +145,7 @@ int rejestracja_main() {
         issued.ticket_number = ticket_number;
         issued.department = department;
         issued.redirected_from_sa = 0;
+        issued.reject_reason = TicketRejectReason::None;
 
         if (ipc::msg::send<TicketIssuedMsg>(msg_req_id, static_cast<long>(request.petent_id), issued) == -1) {
             std::string error = "Blad wyslania biletu dla petenta " + std::to_string(request.petent_id);

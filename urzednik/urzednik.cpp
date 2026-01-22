@@ -85,34 +85,56 @@ int urzednik_main(UrzednikRole role) {
                 int target_msg_id = ipc::helper::get_role_queue(target);
                 if (target_msg_id != -1) {
                     uint32_t ticket_number = 0;
+                    bool limit_reached = false;
                     if (ipc::sem::wait(sem_id, 1) == -1) {
                         Logger::log(LogSeverity::Err, Identity::Urzednik, role,
                                     "Blad blokady licznika biletow dla przekierowania.");
                     }
                     else {
-                        ticket_number = ++shared_state->ticket_counters[static_cast<int>(target)];
+                        int target_idx = static_cast<int>(target);
+                        uint32_t limit = shared_state->ticket_limits[target_idx];
+                        uint32_t current = shared_state->ticket_counters[target_idx];
+                        if (limit != 0 && current >= limit) {
+                            limit_reached = true;
+                        }
+                        else {
+                            ticket_number = ++shared_state->ticket_counters[target_idx];
+                        }
                         if (ipc::sem::post(sem_id, 1) == -1) {
                             Logger::log(LogSeverity::Err, Identity::Urzednik, role,
                                         "Blad odblokowania licznika biletow dla przekierowania.");
                         }
                     }
 
+                    if (limit_reached) {
+                        auto dept_name = urzednik_role_to_string(target);
+                        std::string dept = dept_name ? std::string(*dept_name) : std::string("?");
+                        Logger::log(LogSeverity::Notice, Identity::Urzednik, role,
+                                    "Brak wolnych terminow w wydziale " + dept +
+                                        " dla petenta " + std::to_string(ticket.petent_id) +
+                                        ", przekierowanie odrzucone.");
+                        redirected = true;
+                    }
+                    else {
+
                     TicketIssuedMsg redirect_msg{};
                     redirect_msg.petent_id = ticket.petent_id;
                     redirect_msg.ticket_number = ticket_number;
                     redirect_msg.department = target;
                     redirect_msg.redirected_from_sa = 1;
+                    redirect_msg.reject_reason = TicketRejectReason::None;
 
-                    if (ipc::msg::send<TicketIssuedMsg>(target_msg_id, kUrzednikQueueType, redirect_msg) == -1) {
-                        std::string error =
-                            "Blad wyslania przekierowania dla petenta " + std::to_string(ticket.petent_id);
-                        Logger::log(LogSeverity::Err, Identity::Urzednik, role, error);
-                    }
-                    else {
-                        Logger::log(LogSeverity::Notice, Identity::Urzednik, role,
-                                    "Przekierowano petenta " + std::to_string(ticket.petent_id) +
-                                        " do innego wydzialu.");
-                        redirected = true;
+                        if (ipc::msg::send<TicketIssuedMsg>(target_msg_id, kUrzednikQueueType, redirect_msg) == -1) {
+                            std::string error =
+                                "Blad wyslania przekierowania dla petenta " + std::to_string(ticket.petent_id);
+                            Logger::log(LogSeverity::Err, Identity::Urzednik, role, error);
+                        }
+                        else {
+                            Logger::log(LogSeverity::Notice, Identity::Urzednik, role,
+                                        "Przekierowano petenta " + std::to_string(ticket.petent_id) +
+                                            " do innego wydzialu.");
+                            redirected = true;
+                        }
                     }
                 }
                 else {

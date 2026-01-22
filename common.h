@@ -1,6 +1,7 @@
 #ifndef SO_PROJEKT_COMMON_H
 #define SO_PROJEKT_COMMON_H
 
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <random>
@@ -44,19 +45,23 @@ inline std::optional<std::string_view> urzednik_role_to_string(UrzednikRole role
     return std::nullopt;
 }
 
-enum class OfficeStatus { Open, Closed };
+enum class OfficeStatus: bool { Open, Closed };
+
+enum class TicketRejectReason : uint8_t { None, OfficeClosed, LimitReached };
 
 struct SharedState {
     uint32_t day;
     uint32_t building_capacity; // N
     uint32_t current_queue_length;
     uint8_t ticket_machines_num;
+    uint32_t ticket_limits[5];
     uint32_t ticket_counters[5];
     uint32_t simulated_time; // Essentially ticks (which can be affected by TIME_MUL)
     OfficeStatus office_status;
 
-    SharedState(uint32_t capacity) :
+    SharedState(uint32_t capacity, const std::array<uint32_t, 5>& limits) :
         day(0), building_capacity(capacity), current_queue_length(0), ticket_machines_num(1),
+        ticket_limits{limits[0], limits[1], limits[2], limits[3], limits[4]},
         ticket_counters{0, 0, 0, 0, 0},
         simulated_time(0), office_status(OfficeStatus::Closed) {}
 };
@@ -73,7 +78,8 @@ struct TicketIssuedMsg {
     uint32_t ticket_number;
     UrzednikRole department; // uint8_t
     uint8_t redirected_from_sa; // boolean
-    uint16_t padding; // for explicit alignment
+    TicketRejectReason reject_reason; // uint8_t
+    uint8_t padding; // for explicit alignment
 };
 
 namespace rng {

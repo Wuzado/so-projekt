@@ -115,8 +115,18 @@ int petent_main() {
         break;
     }
 
-    if (issued.ticket_number == 0) {
+    if (issued.reject_reason == TicketRejectReason::OfficeClosed) {
         Logger::log(LogSeverity::Notice, Identity::Petent, "Urzad zamkniety - bilet nie zostal wydany.");
+        ipc::shm::detach(shared_state);
+        return 0;
+    }
+    if (issued.reject_reason == TicketRejectReason::LimitReached) {
+        Logger::log(LogSeverity::Notice, Identity::Petent, "Brak wolnych terminow - bilet nie zostal wydany.");
+        ipc::shm::detach(shared_state);
+        return 0;
+    }
+    if (issued.ticket_number == 0) {
+        Logger::log(LogSeverity::Notice, Identity::Petent, "Bilet nie zostal wydany.");
         ipc::shm::detach(shared_state);
         return 0;
     }

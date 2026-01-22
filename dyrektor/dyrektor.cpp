@@ -70,7 +70,7 @@ static short desired_ticket_machines(const SharedState* shared_state) {
 using process::UrzednikProcess;
 using process::UrzednikQueue;
 
-int dyrektor_main(HoursOpen hours_open) {
+int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& limits) {
     std::signal(SIGINT, handle_shutdown_signal);
     std::signal(SIGTERM, handle_shutdown_signal);
 
@@ -103,7 +103,7 @@ int dyrektor_main(HoursOpen hours_open) {
         return 1;
     }
 
-    new (shared_state) SharedState(100);
+    new (shared_state) SharedState(100, limits);
 
     key_t msg_req_key = ipc::make_key(ipc::KeyType::MsgQueueRejestracja);
     if (msg_req_key == -1) {
