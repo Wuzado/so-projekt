@@ -239,6 +239,7 @@ namespace process {
         }
         TicketRequestMsg shutdown_msg{};
         shutdown_msg.petent_id = 0;
+        shutdown_msg.department = UrzednikRole::SA;
         for (int i = 0; i < count; ++i) {
             if (ipc::msg::send<TicketRequestMsg>(msg_req_id, 1, shutdown_msg) == -1) {
                 break;

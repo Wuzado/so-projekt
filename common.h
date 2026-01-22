@@ -67,9 +67,10 @@ struct SharedState {
 
 struct TicketRequestMsg {
     uint32_t petent_id;
+    UrzednikRole department; // uint8_t
     uint8_t is_vip; // boolean
     uint8_t has_child; // boolean
-    uint16_t padding; // for explicit alignment
+    uint8_t padding; // for explicit alignment
 };
 
 struct TicketIssuedMsg {

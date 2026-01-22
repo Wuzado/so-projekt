@@ -17,7 +17,7 @@ static void log_evacuation() {
     Logger::log(LogSeverity::Notice, Identity::Petent, "Ewakuacja - petent opuszcza budynek.");
 }
 
-int petent_main() {
+int petent_main(UrzednikRole department) {
     std::signal(SIGUSR2, handle_evacuation_signal);
     std::signal(SIGTERM, handle_evacuation_signal);
     std::signal(SIGINT, handle_evacuation_signal);
@@ -77,6 +77,7 @@ int petent_main() {
     pid_t petent_id = getpid();
     TicketRequestMsg request{};
     request.petent_id = petent_id;
+    request.department = department;
     request.is_vip = rng::random_int(1, 100) <= 10 ? 1 : 0;
     request.has_child = rng::random_int(1, 100) <= 20 ? 1 : 0;
 

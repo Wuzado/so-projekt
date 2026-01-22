@@ -3,6 +3,6 @@
 
 #include "../common.h"
 
-int petent_main();
+int petent_main(UrzednikRole department);
 
 #endif //SO_PROJEKT_PETENT_H

@@ -40,7 +40,7 @@ void print_usage(char* program_name) {
               << "Maksymalne opoznienie miedzy petentami, domyslnie 5\n"
               << "Argumenty urzednika:\n"
               << "  --dept <SC|KM|ML|PD|SA>  "
-              << "Wydzial urzednika\n";
+              << "Wydzial urzednika/petenta\n";
 }
 
 struct Config {
@@ -222,7 +222,11 @@ int main(int argc, char* argv[]) {
             urzednik_main(*config->urzednik_role);
             break;
         case Identity::Petent:
-            petent_main();
+            if (!config->urzednik_role) {
+                Logger::log(LogSeverity::Err, Identity::Petent, "Brak parametru --dept.");
+                return 1;
+            }
+            petent_main(*config->urzednik_role);
             break;
         case Identity::Generator:
             generator_main(config->gen_min_delay_sec, config->gen_max_delay_sec, config->time_mul);

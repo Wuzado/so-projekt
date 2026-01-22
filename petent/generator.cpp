@@ -13,6 +13,23 @@ static volatile sig_atomic_t generator_running = 1;
 
 static void handle_shutdown_signal(int) { generator_running = 0; }
 
+static UrzednikRole choose_department() {
+    int roll = rng::random_int(1, 100);
+    if (roll <= 60) {
+        return UrzednikRole::SA;
+    }
+    if (roll <= 70) {
+        return UrzednikRole::SC;
+    }
+    if (roll <= 80) {
+        return UrzednikRole::KM;
+    }
+    if (roll <= 90) {
+        return UrzednikRole::ML;
+    }
+    return UrzednikRole::PD;
+}
+
 static pid_t spawn_petent() {
     pid_t pid = fork();
     if (pid == -1) {
@@ -20,7 +37,14 @@ static pid_t spawn_petent() {
         return -1;
     }
     if (pid == 0) {
-        execl("/proc/self/exe", "so_projekt", "--role", "petent", static_cast<char*>(nullptr));
+        UrzednikRole department = choose_department();
+        auto dept_name = urzednik_role_to_string(department);
+        if (!dept_name) {
+            Logger::log(LogSeverity::Err, Identity::Generator, "Nieznany wydzial petenta.");
+            _exit(1);
+        }
+        execl("/proc/self/exe", "so_projekt", "--role", "petent", "--dept", dept_name->data(),
+              static_cast<char*>(nullptr));
         perror("exec failed");
         _exit(1);
     }

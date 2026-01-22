@@ -18,21 +18,17 @@ static void handle_finish_signal(int) {
     stop_after_current = 1;
 }
 
-UrzednikRole choose_department() {
-    int roll = rng::random_int(1, 100);
-    if (roll <= 60) {
-        return UrzednikRole::SA;
+static bool is_valid_department(UrzednikRole department) {
+    switch (department) {
+        case UrzednikRole::SC:
+        case UrzednikRole::KM:
+        case UrzednikRole::ML:
+        case UrzednikRole::PD:
+        case UrzednikRole::SA:
+            return true;
+        default:
+            return false;
     }
-    if (roll <= 70) {
-        return UrzednikRole::SC;
-    }
-    if (roll <= 80) {
-        return UrzednikRole::KM;
-    }
-    if (roll <= 90) {
-        return UrzednikRole::ML;
-    }
-    return UrzednikRole::PD;
 }
 
 int rejestracja_main() {
@@ -101,7 +97,11 @@ int rejestracja_main() {
             continue;
         }
 
-        UrzednikRole department = choose_department();
+        UrzednikRole department = request.department;
+        if (!is_valid_department(department)) {
+            Logger::log(LogSeverity::Err, Identity::Rejestracja, "Nieprawidlowy wydzial w prosbie o bilet.");
+            department = UrzednikRole::SA;
+        }
         int idx = static_cast<int>(department);
         uint32_t ticket_number = 0;
         TicketRejectReason reject_reason = TicketRejectReason::None;
