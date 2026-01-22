@@ -154,14 +154,14 @@ int main(int argc, char* argv[]) {
     switch (config->role) {
         case Identity::Dyrektor:
         {
-            std::array<uint32_t, 5> limits = {
+            std::array<uint32_t, 5> department_limits = {
+                static_cast<uint32_t>(config->X1),
                 static_cast<uint32_t>(config->X2),
                 static_cast<uint32_t>(config->X3),
                 static_cast<uint32_t>(config->X4),
-                static_cast<uint32_t>(config->X5),
-                static_cast<uint32_t>(config->X1) * 2u
+                static_cast<uint32_t>(config->X5)
             };
-            dyrektor_main({config->Tp, config->Tk}, limits);
+            dyrektor_main({config->Tp, config->Tk}, department_limits);
             break;
         }
         case Identity::Rejestracja:

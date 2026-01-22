@@ -1,11 +1,17 @@
 #ifndef SO_PROJEKT_PROCESS_MANAGER_H
 #define SO_PROJEKT_PROCESS_MANAGER_H
 
+#include <array>
 #include <sys/types.h>
 #include <vector>
 #include "../common.h"
 
 namespace process {
+
+struct ProcessConfig {
+    HoursOpen hours_open;
+    std::array<uint32_t, 5> department_limits;
+};
 
 struct UrzednikProcess {
     pid_t pid;
@@ -18,11 +24,11 @@ struct UrzednikQueue {
     int count;
 };
 
-pid_t spawn_rejestracja();
+pid_t spawn_rejestracja(const ProcessConfig& config);
 void terminate_rejestracja(pid_t pid);
 
-bool spawn_rejestracja_group(std::vector<pid_t>& rejestracja_pids);
-bool spawn_urzednicy(std::vector<UrzednikProcess>& urzednik_pids);
+bool spawn_rejestracja_group(std::vector<pid_t>& rejestracja_pids, const ProcessConfig& config);
+bool spawn_urzednicy(std::vector<UrzednikProcess>& urzednik_pids, const ProcessConfig& config);
 
 void stop_daily_rejestracja(std::vector<pid_t>& rejestracja_pids);
 void stop_daily_urzednik(std::vector<UrzednikProcess>& urzednik_pids);
