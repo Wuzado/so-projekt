@@ -20,15 +20,15 @@ void print_usage(char* program_name) {
               << "  --Tk <godzina>  "
               << "Godzina zamkniecia urzedu (0-23), domyslnie 16\n"
               << "  --X1 <limit>    "
-              << "Limit przyjec dla urzednikow SA (na urzednika), domyslnie 20\n"
+              << "Limit przyjec dla urzednikow SA (na urzednika), domyslnie 2000\n"
               << "  --X2 <limit>    "
-              << "Limit przyjec dla urzednika SC, domyslnie 10\n"
+              << "Limit przyjec dla urzednika SC, domyslnie 1000\n"
               << "  --X3 <limit>    "
-              << "Limit przyjec dla urzednika KM, domyslnie 10\n"
+              << "Limit przyjec dla urzednika KM, domyslnie 1000\n"
               << "  --X4 <limit>    "
-              << "Limit przyjec dla urzednika ML, domyslnie 10\n"
+              << "Limit przyjec dla urzednika ML, domyslnie 1000\n"
               << "  --X5 <limit>    "
-              << "Limit przyjec dla urzednika PD, domyslnie 10\n"
+              << "Limit przyjec dla urzednika PD, domyslnie 1000\n"
               << "Argumenty urzednika:\n"
               << "  --dept <SC|KM|ML|PD|SA>  "
               << "Wydzial urzednika\n";
@@ -38,11 +38,11 @@ struct Config {
     Identity role = Identity::Dyrektor;
     int Tp = 8;
     int Tk = 16;
-    int X1 = 20;
-    int X2 = 10;
-    int X3 = 10;
-    int X4 = 10;
-    int X5 = 10;
+    int X1 = 2000;
+    int X2 = 1000;
+    int X3 = 1000;
+    int X4 = 1000;
+    int X5 = 1000;
     std::optional<UrzednikRole> urzednik_role;
 
     static std::optional<Config> parse_arguments(int argc, char* argv[]) {
