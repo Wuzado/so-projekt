@@ -52,7 +52,11 @@ void init_clock(SharedState* state, HoursOpen hours_open) {
                 break;
             }
 
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000 / TIME_MUL));
+            int time_mul = static_cast<int>(state->time_mul);
+            if (time_mul <= 0) {
+                time_mul = 1;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000 / time_mul));
 
             state->simulated_time++;
 

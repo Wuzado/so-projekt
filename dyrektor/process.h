@@ -11,6 +11,9 @@ namespace process {
 struct ProcessConfig {
     HoursOpen hours_open;
     std::array<uint32_t, 5> department_limits;
+    int time_mul;
+    int gen_min_delay_sec;
+    int gen_max_delay_sec;
 };
 
 struct UrzednikProcess {
@@ -25,7 +28,9 @@ struct UrzednikQueue {
 };
 
 pid_t spawn_rejestracja(const ProcessConfig& config);
+pid_t spawn_generator(const ProcessConfig& config);
 void terminate_rejestracja(pid_t pid);
+void terminate_generator(pid_t pid);
 
 bool spawn_rejestracja_group(std::vector<pid_t>& rejestracja_pids, const ProcessConfig& config);
 bool spawn_urzednicy(std::vector<UrzednikProcess>& urzednik_pids, const ProcessConfig& config);

@@ -19,9 +19,12 @@ static void handle_shutdown_signal(int) { urzednik_running = 0; }
 
 static void handle_finish_signal(int) { stop_after_current = 1; }
 
-static void short_work_delay() {
+static void short_work_delay(int time_mul) {
     int delay_ms = rng::random_int(5, 30);
-    std::this_thread::sleep_for(std::chrono::minutes(delay_ms / TIME_MUL));
+    if (time_mul <= 0) {
+        time_mul = 1;
+    }
+    std::this_thread::sleep_for(std::chrono::minutes(delay_ms / time_mul));
 }
 
 static UrzednikRole get_rand_redirect() {
@@ -77,7 +80,7 @@ int urzednik_main(UrzednikRole role) {
                     "Rozpoczecie obslugi petenta " + std::to_string(ticket.petent_id) + " (bilet " +
                         std::to_string(ticket.ticket_number) + ").");
 
-        short_work_delay();
+        short_work_delay(static_cast<int>(shared_state->time_mul));
 
         bool redirected = false;
         if (role == UrzednikRole::SA && shared_state->office_status == OfficeStatus::Open) {

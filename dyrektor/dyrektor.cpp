@@ -93,7 +93,8 @@ static void drain_unserved_tickets(const std::vector<process::UrzednikQueue>& qu
 using process::UrzednikProcess;
 using process::UrzednikQueue;
 
-int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& department_limits) {
+int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& department_limits, int time_mul,
+                  int gen_min_delay_sec, int gen_max_delay_sec, bool spawn_generator) {
     std::signal(SIGINT, handle_shutdown_signal);
     std::signal(SIGTERM, handle_shutdown_signal);
 
@@ -134,7 +135,7 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
         department_limits[0] * 2u
     };
 
-    new (shared_state) SharedState(100, ticket_limits);
+    new (shared_state) SharedState(100, ticket_limits, static_cast<uint32_t>(time_mul));
 
     key_t msg_req_key = ipc::make_key(ipc::KeyType::MsgQueueRejestracja);
     if (msg_req_key == -1) {
@@ -196,10 +197,22 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
         return 1;
     }
 
-    process::ProcessConfig process_config{hours_open, department_limits};
+    process::ProcessConfig process_config{hours_open, department_limits, time_mul, gen_min_delay_sec, gen_max_delay_sec};
 
     std::vector<UrzednikProcess> urzednik_pids;
+    pid_t generator_pid = -1;
+    if (spawn_generator) {
+        generator_pid = process::spawn_generator(process_config);
+        if (generator_pid == -1) {
+            cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, sem_id,
+                    lock_file);
+            return 1;
+        }
+    }
     if (!process::spawn_urzednicy(urzednik_pids, process_config)) {
+        if (generator_pid != -1) {
+            process::terminate_generator(generator_pid);
+        }
         cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, sem_id,
                 lock_file);
         return 1;
@@ -208,6 +221,9 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
     if (!process::spawn_rejestracja_group(rejestracja_pids, process_config)) {
         process::send_urzednik_shutdowns(urzednik_queues);
         process::terminate_urzednik_all(urzednik_pids);
+        if (generator_pid != -1) {
+            process::terminate_generator(generator_pid);
+        }
         cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, sem_id,
                 lock_file);
         return 1;
@@ -220,6 +236,9 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
         process::send_urzednik_shutdowns(urzednik_queues);
         process::terminate_rejestracja_all(rejestracja_pids);
         process::terminate_urzednik_all(urzednik_pids);
+        if (generator_pid != -1) {
+            process::terminate_generator(generator_pid);
+        }
         cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, sem_id,
                 lock_file);
         return 1;
@@ -296,6 +315,9 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
 
     process::terminate_rejestracja_all(rejestracja_pids);
     process::terminate_urzednik_all(urzednik_pids);
+    if (generator_pid != -1) {
+        process::terminate_generator(generator_pid);
+    }
 
     cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, sem_id, lock_file);
     return 0;

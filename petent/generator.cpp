@@ -33,18 +33,21 @@ static void reap_children() {
     }
 }
 
-static void sleep_scaled_seconds(int seconds) {
+static void sleep_scaled_seconds(int seconds, int time_mul) {
     if (seconds <= 0) {
         return;
     }
-    int base_ms = 1000 / TIME_MUL;
+    if (time_mul <= 0) {
+        time_mul = 1;
+    }
+    int base_ms = 1000 / time_mul;
     if (base_ms <= 0) {
         base_ms = 1;
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(base_ms * seconds));
 }
 
-int generator_main() {
+int generator_main(int min_delay_sec, int max_delay_sec, int time_mul) {
     std::signal(SIGTERM, handle_shutdown_signal);
     std::signal(SIGINT, handle_shutdown_signal);
 
@@ -55,13 +58,20 @@ int generator_main() {
         return 1;
     }
 
+    if (min_delay_sec < 0) {
+        min_delay_sec = 0;
+    }
+    if (max_delay_sec < min_delay_sec) {
+        max_delay_sec = min_delay_sec;
+    }
+
     while (generator_running) {
         if (shared_state->office_status == OfficeStatus::Open) {
             if (spawn_petent() == -1) {
                 Logger::log(LogSeverity::Err, Identity::Generator, "Nie udalo sie utworzyc procesu petenta.");
             }
-            int delay_sec = rng::random_int(1, 5);
-            sleep_scaled_seconds(delay_sec);
+            int delay_sec = rng::random_int(min_delay_sec, max_delay_sec);
+            sleep_scaled_seconds(delay_sec, time_mul);
         } else {
             std::this_thread::sleep_for(std::chrono::milliseconds(200));
         }

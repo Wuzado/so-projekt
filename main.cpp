@@ -14,6 +14,8 @@ void print_usage(char* program_name) {
               << "Ogolne argumenty:\n"
               << "  --role <rola>  "
               << "Okresla role (dyrektor/petent/rejestracja/urzednik/generator)\n"
+              << "  --time-mul <mnoznik>  "
+              << "Mnoznik czasu symulacji, domyslnie 1000\n"
               << "Argumenty dyrektora:\n"
               << "  --Tp <godzina>  "
               << "Godzina otwarcia urzedu (0-23), domyslnie 8\n"
@@ -29,6 +31,13 @@ void print_usage(char* program_name) {
               << "Limit przyjec dla urzednika ML, domyslnie 1000\n"
               << "  --X5 <limit>    "
               << "Limit przyjec dla urzednika PD, domyslnie 1000\n"
+              << "  --gen-from-dyrektor  "
+              << "Uruchamia generator petentow jako proces potomny dyrektora\n"
+              << "Argumenty generatora petentow:\n"
+              << "  --gen-min-delay <sek>  "
+              << "Minimalne opoznienie miedzy petentami, domyslnie 1\n"
+              << "  --gen-max-delay <sek>  "
+              << "Maksymalne opoznienie miedzy petentami, domyslnie 5\n"
               << "Argumenty urzednika:\n"
               << "  --dept <SC|KM|ML|PD|SA>  "
               << "Wydzial urzednika\n";
@@ -43,6 +52,10 @@ struct Config {
     int X3 = 1000;
     int X4 = 1000;
     int X5 = 1000;
+    int time_mul = 1000;
+    int gen_min_delay_sec = 1;
+    int gen_max_delay_sec = 5;
+    bool spawn_generator = false;
     std::optional<UrzednikRole> urzednik_role;
 
     static std::optional<Config> parse_arguments(int argc, char* argv[]) {
@@ -108,6 +121,30 @@ struct Config {
                     return std::nullopt;
                 }
             }
+            else if (arg == "--time-mul" && i + 1 < argc) {
+                config.time_mul = std::stoi(argv[++i]);
+                if (config.time_mul <= 0) {
+                    std::cerr << "Blad: --time-mul musi byc > 0\n";
+                    return std::nullopt;
+                }
+            }
+            else if (arg == "--gen-min-delay" && i + 1 < argc) {
+                config.gen_min_delay_sec = std::stoi(argv[++i]);
+                if (config.gen_min_delay_sec < 0) {
+                    std::cerr << "Blad: --gen-min-delay musi byc >= 0\n";
+                    return std::nullopt;
+                }
+            }
+            else if (arg == "--gen-max-delay" && i + 1 < argc) {
+                config.gen_max_delay_sec = std::stoi(argv[++i]);
+                if (config.gen_max_delay_sec < 0) {
+                    std::cerr << "Blad: --gen-max-delay musi byc >= 0\n";
+                    return std::nullopt;
+                }
+            }
+            else if (arg == "--gen-from-dyrektor") {
+                config.spawn_generator = true;
+            }
             else if (arg == "--dept" && i + 1 < argc) {
                 auto role_opt = string_to_urzednik_role(argv[++i]);
                 if (!role_opt) {
@@ -125,6 +162,11 @@ struct Config {
         // Validate Tp < Tk
         if (config.Tp >= config.Tk) {
             std::cerr << "Blad: Godzina otwarcia (--Tp) musi byc wczesniejsza niz godzina zamkniecia (--Tk)\n";
+            return std::nullopt;
+        }
+
+        if (config.gen_min_delay_sec > config.gen_max_delay_sec) {
+            std::cerr << "Blad: --gen-min-delay nie moze byc wiekszy niz --gen-max-delay\n";
             return std::nullopt;
         }
 
@@ -148,7 +190,11 @@ int main(int argc, char* argv[]) {
         " X2=" + std::to_string(config->X2) +
         " X3=" + std::to_string(config->X3) +
         " X4=" + std::to_string(config->X4) +
-        " X5=" + std::to_string(config->X5)
+        " X5=" + std::to_string(config->X5) +
+        " time_mul=" + std::to_string(config->time_mul) +
+        " gen_min_delay=" + std::to_string(config->gen_min_delay_sec) +
+        " gen_max_delay=" + std::to_string(config->gen_max_delay_sec) +
+        " gen_from_dyrektor=" + std::to_string(config->spawn_generator)
     );
 
     switch (config->role) {
@@ -161,7 +207,8 @@ int main(int argc, char* argv[]) {
                 static_cast<uint32_t>(config->X4),
                 static_cast<uint32_t>(config->X5)
             };
-            dyrektor_main({config->Tp, config->Tk}, department_limits);
+            dyrektor_main({config->Tp, config->Tk}, department_limits, config->time_mul,
+                          config->gen_min_delay_sec, config->gen_max_delay_sec, config->spawn_generator);
             break;
         }
         case Identity::Rejestracja:
@@ -178,7 +225,7 @@ int main(int argc, char* argv[]) {
             petent_main();
             break;
         case Identity::Generator:
-            generator_main();
+            generator_main(config->gen_min_delay_sec, config->gen_max_delay_sec, config->time_mul);
             break;
     }
 

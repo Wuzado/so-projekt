@@ -12,8 +12,6 @@
 
 typedef std::pair<short, short> HoursOpen; // tp, tk
 
-constexpr int TIME_MUL = 1000;
-
 enum class Identity { Petent, Urzednik, Dyrektor, Rejestracja, Generator };
 
 inline std::optional<Identity> string_to_identity(std::string_view str) {
@@ -56,14 +54,15 @@ struct SharedState {
     uint8_t ticket_machines_num;
     uint32_t ticket_limits[5];
     uint32_t ticket_counters[5];
-    uint32_t simulated_time; // Essentially ticks (which can be affected by TIME_MUL)
+    uint32_t simulated_time; // Essentially ticks (which can be affected by time_mul)
+    uint32_t time_mul;
     OfficeStatus office_status;
 
-    SharedState(uint32_t capacity, const std::array<uint32_t, 5>& limits) :
+    SharedState(uint32_t capacity, const std::array<uint32_t, 5>& limits, uint32_t time_mul_value) :
         day(0), building_capacity(capacity), current_queue_length(0), ticket_machines_num(1),
         ticket_limits{limits[0], limits[1], limits[2], limits[3], limits[4]},
         ticket_counters{0, 0, 0, 0, 0},
-        simulated_time(0), office_status(OfficeStatus::Closed) {}
+        simulated_time(0), time_mul(time_mul_value), office_status(OfficeStatus::Closed) {}
 };
 
 struct TicketRequestMsg {

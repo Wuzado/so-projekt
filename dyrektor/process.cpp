@@ -11,7 +11,7 @@ namespace process {
 
     static std::vector<std::string> build_common_args(const char* role, const ProcessConfig& config) {
         std::vector<std::string> args;
-        args.reserve(14);
+        args.reserve(20);
         args.emplace_back("so_projekt");
         args.emplace_back("--role");
         args.emplace_back(role);
@@ -29,6 +29,12 @@ namespace process {
         args.emplace_back(std::to_string(config.department_limits[3]));
         args.emplace_back("--X5");
         args.emplace_back(std::to_string(config.department_limits[4]));
+        args.emplace_back("--time-mul");
+        args.emplace_back(std::to_string(config.time_mul));
+        args.emplace_back("--gen-min-delay");
+        args.emplace_back(std::to_string(config.gen_min_delay_sec));
+        args.emplace_back("--gen-max-delay");
+        args.emplace_back(std::to_string(config.gen_max_delay_sec));
         return args;
     }
 
@@ -90,11 +96,38 @@ namespace process {
         return pid;
     }
 
+    pid_t spawn_generator(const ProcessConfig& config) {
+        pid_t pid = fork();
+        if (pid == -1) {
+            perror("fork failed");
+            return -1;
+        }
+        if (pid == 0) {
+            std::vector<std::string> args = build_common_args("generator", config);
+            exec_with_args(args);
+            perror("exec failed");
+            _exit(1);
+        }
+        return pid;
+    }
+
     void terminate_rejestracja(pid_t pid) {
         if (pid <= 0) {
             return;
         }
         waitpid(pid, nullptr, 0);
+    }
+
+    void terminate_generator(pid_t pid) {
+        if (pid <= 0) {
+            return;
+        }
+        if (kill(pid, SIGTERM) == -1) {
+            perror("kill failed");
+        }
+        if (waitpid(pid, nullptr, 0) == -1 && errno != ECHILD) {
+            perror("waitpid failed");
+        }
     }
 
     bool spawn_rejestracja_group(std::vector<pid_t>& rejestracja_pids, const ProcessConfig& config) {
