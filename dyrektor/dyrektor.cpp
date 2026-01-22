@@ -5,6 +5,7 @@
 #include <cstring>
 #include <fcntl.h>
 #include <pthread.h>
+#include <sys/msg.h>
 #include <sys/wait.h>
 #include <thread>
 #include <unistd.h>
@@ -12,6 +13,7 @@
 #include "../common.h"
 #include "../ipcutils.h"
 #include "../logger.h"
+#include "../report.h"
 #include "clock.h"
 #include "process.h"
 
@@ -67,10 +69,31 @@ static short desired_ticket_machines(const SharedState* shared_state) {
     return 1;
 }
 
+static void drain_unserved_tickets(const std::vector<process::UrzednikQueue>& queues, uint32_t report_day) {
+    for (const auto& queue : queues) {
+        while (true) {
+            TicketIssuedMsg ticket{};
+            int rc = ipc::msg::receive<TicketIssuedMsg>(queue.msg_id, 1, &ticket, IPC_NOWAIT);
+            if (rc == -1) {
+                if (errno == ENOMSG) {
+                    break;
+                }
+                break;
+            }
+
+            if (ticket.petent_id == 0) {
+                continue;
+            }
+
+            report::log_unserved_after_close(report_day, ticket.petent_id, ticket.department, ticket.ticket_number);
+        }
+    }
+}
+
 using process::UrzednikProcess;
 using process::UrzednikQueue;
 
-int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& limits) {
+int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& department_limits) {
     std::signal(SIGINT, handle_shutdown_signal);
     std::signal(SIGTERM, handle_shutdown_signal);
 
@@ -103,7 +126,15 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& limits) {
         return 1;
     }
 
-    new (shared_state) SharedState(100, limits);
+    std::array<uint32_t, 5> ticket_limits = {
+        department_limits[1],
+        department_limits[2],
+        department_limits[3],
+        department_limits[4],
+        department_limits[0] * 2u
+    };
+
+    new (shared_state) SharedState(100, ticket_limits);
 
     key_t msg_req_key = ipc::make_key(ipc::KeyType::MsgQueueRejestracja);
     if (msg_req_key == -1) {
@@ -165,14 +196,16 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& limits) {
         return 1;
     }
 
+    process::ProcessConfig process_config{hours_open, department_limits};
+
     std::vector<UrzednikProcess> urzednik_pids;
-    if (!process::spawn_urzednicy(urzednik_pids)) {
+    if (!process::spawn_urzednicy(urzednik_pids, process_config)) {
         cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, sem_id,
                 lock_file);
         return 1;
     }
     std::vector<pid_t> rejestracja_pids;
-    if (!process::spawn_rejestracja_group(rejestracja_pids)) {
+    if (!process::spawn_rejestracja_group(rejestracja_pids, process_config)) {
         process::send_urzednik_shutdowns(urzednik_queues);
         process::terminate_urzednik_all(urzednik_pids);
         cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, sem_id,
@@ -197,22 +230,25 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& limits) {
     // Main dyrektor loop
     while (simulation_running.load()) {
         if (shared_state->day != last_day) {
+            uint32_t report_day = last_day + 1;
             Logger::log(LogSeverity::Notice, Identity::Dyrektor, "Restart dzienny urzednikow i rejestracji.");
 
             process::stop_daily_rejestracja(rejestracja_pids);
             process::stop_daily_urzednik(urzednik_pids);
+
+            drain_unserved_tickets(urzednik_queues, report_day);
 
             shared_state->current_queue_length = 0;
             for (auto& counter : shared_state->ticket_counters) {
                 counter = 0;
             }
 
-            if (!process::spawn_urzednicy(urzednik_pids)) {
+            if (!process::spawn_urzednicy(urzednik_pids, process_config)) {
                 Logger::log(LogSeverity::Emerg, Identity::Dyrektor, "Nie udalo sie odtworzyc urzednikow po dniu.");
                 simulation_running = false;
                 break;
             }
-            if (!process::spawn_rejestracja_group(rejestracja_pids)) {
+            if (!process::spawn_rejestracja_group(rejestracja_pids, process_config)) {
                 Logger::log(LogSeverity::Emerg, Identity::Dyrektor, "Nie udalo sie odtworzyc rejestracji po dniu.");
                 process::terminate_urzednik_all(urzednik_pids);
                 simulation_running = false;
@@ -228,7 +264,7 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& limits) {
         auto current = static_cast<short>(rejestracja_pids.size());
 
         while (current < target) {
-            pid_t pid = process::spawn_rejestracja();
+            pid_t pid = process::spawn_rejestracja(process_config);
             if (pid == -1) {
                 break;
             }

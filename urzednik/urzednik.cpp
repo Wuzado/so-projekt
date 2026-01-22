@@ -4,10 +4,12 @@
 #include <csignal>
 #include <cstring>
 #include <string>
+#include <sys/msg.h>
 #include <thread>
 #include <unistd.h>
 #include "../ipcutils.h"
 #include "../logger.h"
+#include "../report.h"
 
 constexpr long kUrzednikQueueType = 1;
 static volatile sig_atomic_t urzednik_running = 1;
@@ -113,6 +115,7 @@ int urzednik_main(UrzednikRole role) {
                                     "Brak wolnych terminow w wydziale " + dept +
                                         " dla petenta " + std::to_string(ticket.petent_id) +
                                         ", przekierowanie odrzucone.");
+                        report::log_unserved_after_signal(shared_state->day + 1, ticket.petent_id, target, "SA");
                         redirected = true;
                     }
                     else {
@@ -151,6 +154,32 @@ int urzednik_main(UrzednikRole role) {
 
         if (stop_after_current) {
             break;
+        }
+    }
+
+    if (stop_after_current) {
+        while (true) {
+            TicketIssuedMsg ticket{};
+            int rc = ipc::msg::receive<TicketIssuedMsg>(msg_id, kUrzednikQueueType, &ticket, IPC_NOWAIT);
+            if (rc == -1) {
+                if (errno == ENOMSG) {
+                    break;
+                }
+                if (errno == EINTR) {
+                    continue;
+                }
+                std::string error = "Blad odczytu kolejki podczas konczenia pracy: " +
+                                    std::string(std::strerror(errno));
+                Logger::log(LogSeverity::Err, Identity::Urzednik, role, error);
+                break;
+            }
+
+            if (ticket.petent_id == 0) {
+                continue;
+            }
+
+            std::string_view issuer = ticket.redirected_from_sa ? "SA" : "REJESTRACJA";
+            report::log_unserved_after_signal(shared_state->day + 1, ticket.petent_id, ticket.department, issuer);
         }
     }
 
