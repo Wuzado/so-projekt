@@ -73,8 +73,16 @@ int rejestracja_main() {
             break;
         }
 
-        if (shared_state->current_queue_length > 0) {
-            shared_state->current_queue_length--;
+        if (ipc::sem::wait(sem_id, 1) == -1) {
+            Logger::log(LogSeverity::Err, Identity::Rejestracja, "Blad blokady stanu wspoldzielonego.");
+        }
+        else {
+            if (shared_state->current_queue_length > 0) {
+                shared_state->current_queue_length--;
+            }
+            if (ipc::sem::post(sem_id, 1) == -1) {
+                Logger::log(LogSeverity::Err, Identity::Rejestracja, "Blad odblokowania stanu wspoldzielonego.");
+            }
         }
 
         if (ipc::sem::post(sem_id, 0) == -1) {
