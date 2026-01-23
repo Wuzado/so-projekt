@@ -175,12 +175,14 @@ struct Config {
 };
 
 int main(int argc, char* argv[]) {
-    Logger::clear_log();
-
     auto config = Config::parse_arguments(argc, argv);
     if (!config) {
         print_usage(argv[0]);
         return 1;
+    }
+
+    if (config->role == Identity::Dyrektor) {
+        Logger::clear_log();
     }
 
     Logger::log(LogSeverity::Debug, config->role, "Config:" 
