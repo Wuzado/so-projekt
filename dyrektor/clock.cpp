@@ -1,5 +1,5 @@
 #include "clock.h"
-#include <format>
+#include <string>
 #include <pthread.h>
 #include <unistd.h>
 #include "../common.h"
@@ -42,7 +42,7 @@ void init_clock(SharedState* state, HoursOpen hours_open) {
         state->simulated_time = hours_open.first * 3600;
         state->office_status = OfficeStatus::Open;
 
-        std::string message = std::format("Dzien {}: Urzad otwarty.", state->day + 1);
+        std::string message = "Dzien " + std::to_string(state->day + 1) + ": Urzad otwarty.";
         Logger::log(LogSeverity::Info, Identity::Dyrektor, message);
 
         bool wait_after_close = false;

@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -std=c++20 -Wall -Wextra -pthread -I.
+CXXFLAGS = -std=c++17 -Wall -Wextra -pthread -I.
 SRCS = main.cpp dyrektor/dyrektor.cpp dyrektor/clock.cpp dyrektor/process.cpp petent/petent.cpp petent/generator.cpp rejestracja/rejestracja.cpp urzednik/urzednik.cpp
 TARGET = so_projekt
 
@@ -10,6 +10,6 @@ clean:
 	rm -f $(TARGET)
 
 lint:
-	clang-tidy $(SRCS) -- -std=c++20 -I.
+	clang-tidy $(SRCS) -- -std=c++17 -I.
 
 .PHONY: clean lint
