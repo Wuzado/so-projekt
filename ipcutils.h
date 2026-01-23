@@ -45,7 +45,9 @@ namespace ipc {
         int create(key_t key, mode_t permissions = 0660) {
             int shmid = shmget(key, sizeof(T), IPC_CREAT | IPC_EXCL | permissions);
             if (shmid == -1) {
+                int err = errno;
                 perror("shmget failed");
+                errno = err;
                 return -1;
             }
             return shmid;
@@ -103,7 +105,9 @@ namespace ipc {
         inline int create(key_t key, mode_t permissions = 0660) {
             int msqid = msgget(key, IPC_CREAT | IPC_EXCL | permissions);
             if (msqid == -1) {
+                int err = errno;
                 perror("msgget failed");
+                errno = err;
                 return -1;
             }
             return msqid;
@@ -170,7 +174,9 @@ namespace ipc {
         inline int create(key_t key, int nsems = 1, mode_t permissions = 0660) {
             int semid = semget(key, nsems, IPC_CREAT | IPC_EXCL | permissions);
             if (semid == -1) {
+                int err = errno;
                 perror("semget failed");
+                errno = err;
                 return -1;
             }
             return semid;
