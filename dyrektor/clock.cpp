@@ -151,3 +151,14 @@ void notify_day_restart_complete() {
     }
     ipc::cond::broadcast(&restart_cv);
 }
+
+void cleanup_clock() {
+    if (restart_mutex_initialized) {
+        ipc::mutex::destroy(&restart_mutex);
+        restart_mutex_initialized = false;
+    }
+    if (restart_cond_initialized) {
+        ipc::cond::destroy(&restart_cv);
+        restart_cond_initialized = false;
+    }
+}

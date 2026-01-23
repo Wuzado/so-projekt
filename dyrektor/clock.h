@@ -12,5 +12,6 @@ int start_clock(SharedState* shared_state, HoursOpen hours_open, pthread_t* out_
 
 int stop_clock(pthread_t thread);
 void notify_day_restart_complete();
+void cleanup_clock();
 
 #endif // SO_PROJEKT_DYREKTOR_CLOCK_H

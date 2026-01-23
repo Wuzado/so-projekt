@@ -323,6 +323,7 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
         process::terminate_generator(generator_pid);
     }
 
+    cleanup_clock();
     cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, sem_id, lock_file);
     return 0;
 }
