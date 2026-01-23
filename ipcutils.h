@@ -132,6 +132,9 @@ namespace ipc {
         int receive(int msqid, long msg_type, T* data, int flags = 0) {
             MsgEnvelope<T> msg{};
             if (msgrcv(msqid, &msg, sizeof(T), msg_type, flags) == -1) {
+                if (errno == EINTR) {
+                    return -1;
+                }
                 if (!(flags & IPC_NOWAIT && errno == ENOMSG)) {
                     perror("msgrcv failed");
                 }
