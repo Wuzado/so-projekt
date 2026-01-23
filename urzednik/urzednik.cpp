@@ -20,11 +20,15 @@ static void handle_shutdown_signal(int) { urzednik_running = 0; }
 static void handle_finish_signal(int) { stop_after_current = 1; }
 
 static void short_work_delay(int time_mul) {
-    int delay_ms = rng::random_int(5, 30);
+    int delay_minutes = rng::random_int(5, 30);
     if (time_mul <= 0) {
         time_mul = 1;
     }
-    std::this_thread::sleep_for(std::chrono::minutes(delay_ms / time_mul));
+    long long scaled_ms = static_cast<long long>(delay_minutes) * 60'000 / time_mul;
+    if (scaled_ms <= 0) {
+        scaled_ms = 1;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(scaled_ms));
 }
 
 static UrzednikRole get_rand_redirect() {
@@ -161,6 +165,7 @@ int urzednik_main(UrzednikRole role) {
     }
 
     if (stop_after_current) {
+        bool logged_unserved = false;
         while (true) {
             TicketIssuedMsg ticket{};
             int rc = ipc::msg::receive<TicketIssuedMsg>(msg_id, kUrzednikQueueType, &ticket, IPC_NOWAIT);
@@ -183,6 +188,18 @@ int urzednik_main(UrzednikRole role) {
 
             std::string_view issuer = ticket.redirected_from_sa ? "SA" : "REJESTRACJA";
             report::log_unserved_after_signal(shared_state->day + 1, ticket.petent_id, ticket.department, issuer);
+            Logger::log(LogSeverity::Notice, Identity::Urzednik, role,
+                        "skierowanie do " + std::string(urzednik_role_to_string(ticket.department).value_or("?")) +
+                            " - wystawil " + std::string(issuer) +
+                            " - petent " + std::to_string(ticket.petent_id));
+            logged_unserved = true;
+        }
+
+        if (!logged_unserved) {
+            report::log_unserved_after_signal(shared_state->day + 1, 0, role, "DYREKTOR");
+            Logger::log(LogSeverity::Notice, Identity::Urzednik, role,
+                        "skierowanie do " + std::string(urzednik_role_to_string(role).value_or("?")) +
+                            " - wystawil DYREKTOR - petent 0");
         }
     }
 
