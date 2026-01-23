@@ -269,4 +269,22 @@ namespace process {
         }
     }
 
+    namespace group {
+        int init_self() {
+            if (setpgid(0, 0) == -1) {
+                perror("setpgid failed");
+                return -1;
+            }
+            return 0;
+        }
+
+        int signal_self(int signal) {
+            if (killpg(getpgrp(), signal) == -1) {
+                perror("killpg failed");
+                return -1;
+            }
+            return 0;
+        }
+    } // namespace group
+
 } // namespace process

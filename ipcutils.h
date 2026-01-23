@@ -448,6 +448,51 @@ namespace ipc {
 } // namespace ipc
 
 namespace ipc::helper {
+    inline int create_or_reset_shm(key_t key) {
+        int shm_id = shm::create<SharedState>(key);
+        if (shm_id != -1) {
+            return shm_id;
+        }
+        if (errno != EEXIST) {
+            return -1;
+        }
+        int old_id = shm::get<SharedState>(key);
+        if (old_id != -1) {
+            shm::remove(old_id);
+        }
+        return shm::create<SharedState>(key);
+    }
+
+    inline int create_or_reset_msg(key_t key) {
+        int msg_id = msg::create(key);
+        if (msg_id != -1) {
+            return msg_id;
+        }
+        if (errno != EEXIST) {
+            return -1;
+        }
+        int old_id = msg::get(key);
+        if (old_id != -1) {
+            msg::remove(old_id);
+        }
+        return msg::create(key);
+    }
+
+    inline int create_or_reset_sem(key_t key, int nsems) {
+        int sem_id = sem::create(key, nsems);
+        if (sem_id != -1) {
+            return sem_id;
+        }
+        if (errno != EEXIST) {
+            return -1;
+        }
+        int old_id = sem::get(key, nsems);
+        if (old_id != -1) {
+            sem::remove(old_id);
+        }
+        return sem::create(key, nsems);
+    }
+
     inline KeyType role_to_key(UrzednikRole role) {
         switch (role) {
             case UrzednikRole::SA:

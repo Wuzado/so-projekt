@@ -44,6 +44,11 @@ void terminate_urzednik_all(std::vector<UrzednikProcess>& urzednik_pids);
 void send_rejestracja_shutdown(int msg_req_id, int count);
 void send_urzednik_shutdowns(const std::vector<UrzednikQueue>& queues);
 
+namespace group {
+    int init_self();
+    int signal_self(int signal);
+}
+
 } // namespace process
 
 #endif // SO_PROJEKT_PROCESS_MANAGER_H

@@ -97,6 +97,9 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
                   int gen_min_delay_sec, int gen_max_delay_sec, bool spawn_generator) {
     std::signal(SIGINT, handle_shutdown_signal);
     std::signal(SIGTERM, handle_shutdown_signal);
+    std::signal(SIGUSR2, handle_shutdown_signal);
+
+    process::group::init_self();
 
     int lock_file = open(ipc::IPC_LOCK_FILE, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 
@@ -114,7 +117,7 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
         return 1;
     }
 
-    int shm_id = ipc::shm::create<SharedState>(shm_key);
+    int shm_id = ipc::helper::create_or_reset_shm(shm_key);
     if (shm_id == -1) {
         close(lock_file);
         return 1;
@@ -143,7 +146,7 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
         return 1;
     }
 
-    int msg_req_id = ipc::msg::create(msg_req_key);
+    int msg_req_id = ipc::helper::create_or_reset_msg(msg_req_key);
     if (msg_req_id == -1) {
         cleanup(shared_state, shm_id, -1, -1, -1, -1, -1, -1, -1, lock_file);
         return 1;
@@ -159,11 +162,11 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
         return 1;
     }
 
-    int msg_sa_id = ipc::msg::create(msg_sa_key);
-    int msg_sc_id = ipc::msg::create(msg_sc_key);
-    int msg_km_id = ipc::msg::create(msg_km_key);
-    int msg_ml_id = ipc::msg::create(msg_ml_key);
-    int msg_pd_id = ipc::msg::create(msg_pd_key);
+    int msg_sa_id = ipc::helper::create_or_reset_msg(msg_sa_key);
+    int msg_sc_id = ipc::helper::create_or_reset_msg(msg_sc_key);
+    int msg_km_id = ipc::helper::create_or_reset_msg(msg_km_key);
+    int msg_ml_id = ipc::helper::create_or_reset_msg(msg_ml_key);
+    int msg_pd_id = ipc::helper::create_or_reset_msg(msg_pd_key);
     if (msg_sa_id == -1 || msg_sc_id == -1 || msg_km_id == -1 || msg_ml_id == -1 || msg_pd_id == -1) {
         cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, -1, lock_file);
         return 1;
@@ -180,7 +183,7 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
         return 1;
     }
 
-    int sem_id = ipc::sem::create(sem_key, 2);
+    int sem_id = ipc::helper::create_or_reset_sem(sem_key, 2);
     if (sem_id == -1) {
         cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, -1, lock_file);
         return 1;
@@ -308,6 +311,7 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
     }
 
+    process::group::signal_self(SIGUSR2);
     stop_clock(clock_thread);
 
     process::send_rejestracja_shutdown(msg_req_id, static_cast<int>(rejestracja_pids.size()));
