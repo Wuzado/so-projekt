@@ -36,6 +36,20 @@ static UrzednikRole get_rand_redirect() {
     return kTargets[rng::random_int(0, 3)];
 }
 
+static uint32_t resolve_report_day(const SharedState* shared_state) {
+    if (!shared_state) {
+        return 1;
+    }
+    uint32_t day = shared_state->day;
+    if (shared_state->office_status == OfficeStatus::Open) {
+        day += 1;
+    }
+    if (day == 0) {
+        day = 1;
+    }
+    return day;
+}
+
 int urzednik_main(UrzednikRole role) {
     std::signal(SIGTERM, handle_shutdown_signal);
     std::signal(SIGINT, handle_shutdown_signal);
@@ -58,6 +72,11 @@ int urzednik_main(UrzednikRole role) {
     if (msg_id == -1) {
         ipc::shm::detach(shared_state);
         return 1;
+    }
+
+    int msg_req_id = ipc::helper::get_msg_queue(ipc::KeyType::MsgQueueRejestracja);
+    if (msg_req_id == -1) {
+        Logger::log(LogSeverity::Err, Identity::Urzednik, role, "Nie znaleziono kolejki rejestracji.");
     }
 
     while (urzednik_running) {
@@ -122,7 +141,8 @@ int urzednik_main(UrzednikRole role) {
                                     "Brak wolnych terminow w wydziale " + dept +
                                         " dla petenta " + std::to_string(ticket.petent_id) +
                                         ", przekierowanie odrzucone.");
-                        report::log_unserved_after_signal(shared_state->day + 1, ticket.petent_id, target, "SA");
+                        report::log_unserved_after_signal(resolve_report_day(shared_state), ticket.petent_id, target,
+                                                         "SA");
                         redirected = true;
                     }
                     else {
@@ -157,6 +177,16 @@ int urzednik_main(UrzednikRole role) {
         if (!redirected) {
             Logger::log(LogSeverity::Info, Identity::Urzednik, role,
                         "Zakonczono obsluge petenta " + std::to_string(ticket.petent_id) + ".");
+
+            if (msg_req_id != -1) {
+                ServiceDoneMsg done{};
+                done.petent_id = ticket.petent_id;
+                done.department = role;
+                if (ipc::msg::send<ServiceDoneMsg>(msg_req_id, static_cast<long>(ticket.petent_id), done) == -1) {
+                    Logger::log(LogSeverity::Err, Identity::Urzednik, role,
+                                "Blad wyslania potwierdzenia obslugi petenta.");
+                }
+            }
         }
 
         if (stop_after_current) {
@@ -187,7 +217,8 @@ int urzednik_main(UrzednikRole role) {
             }
 
             std::string_view issuer = ticket.redirected_from_sa ? "SA" : "REJESTRACJA";
-            report::log_unserved_after_signal(shared_state->day + 1, ticket.petent_id, ticket.department, issuer);
+            report::log_unserved_after_signal(resolve_report_day(shared_state), ticket.petent_id, ticket.department,
+                                              issuer);
             Logger::log(LogSeverity::Notice, Identity::Urzednik, role,
                         "skierowanie do " + std::string(urzednik_role_to_string(ticket.department).value_or("?")) +
                             " - wystawil " + std::string(issuer) +
@@ -196,7 +227,7 @@ int urzednik_main(UrzednikRole role) {
         }
 
         if (!logged_unserved) {
-            report::log_unserved_after_signal(shared_state->day + 1, 0, role, "DYREKTOR");
+            report::log_unserved_after_signal(resolve_report_day(shared_state), 0, role, "DYREKTOR");
             Logger::log(LogSeverity::Notice, Identity::Urzednik, role,
                         "skierowanie do " + std::string(urzednik_role_to_string(role).value_or("?")) +
                             " - wystawil DYREKTOR - petent 0");

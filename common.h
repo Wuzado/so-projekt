@@ -82,6 +82,12 @@ struct TicketIssuedMsg {
     uint8_t padding; // for explicit alignment
 };
 
+struct ServiceDoneMsg {
+    uint32_t petent_id;
+    UrzednikRole department; // uint8_t
+    uint8_t padding[3]; // for explicit alignment
+};
+
 namespace rng {
     inline int random_int(int min_inclusive, int max_inclusive) {
         static thread_local std::mt19937 engine(std::random_device{}());

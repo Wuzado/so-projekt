@@ -148,6 +148,26 @@ int petent_main(UrzednikRole department) {
     Logger::log(LogSeverity::Info, Identity::Petent,
                 "Petent zglosil sie do urzednika z biletem " + std::to_string(issued.ticket_number) + ".");
 
+    ServiceDoneMsg done{};
+    while (true) {
+        int rc = ipc::msg::receive<ServiceDoneMsg>(msg_req_id, static_cast<long>(petent_id), &done, 0);
+        if (rc == -1) {
+            if (errno == EINTR) {
+                if (petent_evacuating) {
+                    log_evacuation();
+                    ipc::shm::detach(shared_state);
+                    return 0;
+                }
+                continue;
+            }
+            std::string error = "Blad odbioru potwierdzenia obslugi: " + std::string(std::strerror(errno));
+            Logger::log(LogSeverity::Err, Identity::Petent, error);
+            ipc::shm::detach(shared_state);
+            return 1;
+        }
+        break;
+    }
+
     ipc::shm::detach(shared_state);
     return 0;
 }
