@@ -33,11 +33,15 @@ void print_usage(char* program_name) {
               << "Limit przyjec dla urzednika PD, domyslnie 1000\n"
               << "  --gen-from-dyrektor  "
               << "Uruchamia generator petentow jako proces potomny dyrektora\n"
+              << "  --one-day  "
+              << "Uruchamia tylko jeden dzien symulacji (tryb testowy)\n"
               << "Argumenty generatora petentow:\n"
               << "  --gen-min-delay <sek>  "
               << "Minimalne opoznienie miedzy petentami, domyslnie 1\n"
               << "  --gen-max-delay <sek>  "
               << "Maksymalne opoznienie miedzy petentami, domyslnie 5\n"
+              << "  --gen-max-count <liczba>  "
+              << "Maksymalna liczba wygenerowanych petentow (opcjonalnie)\n"
               << "Argumenty urzednika:\n"
               << "  --dept <SC|KM|ML|PD|SA>  "
               << "Wydzial urzednika/petenta\n";
@@ -55,7 +59,9 @@ struct Config {
     int time_mul = 1000;
     int gen_min_delay_sec = 1;
     int gen_max_delay_sec = 5;
+    int gen_max_count = -1;
     bool spawn_generator = false;
+    bool one_day = false;
     std::optional<UrzednikRole> urzednik_role;
 
     static std::optional<Config> parse_arguments(int argc, char* argv[]) {
@@ -142,8 +148,18 @@ struct Config {
                     return std::nullopt;
                 }
             }
+            else if (arg == "--gen-max-count" && i + 1 < argc) {
+                config.gen_max_count = std::stoi(argv[++i]);
+                if (config.gen_max_count < 0) {
+                    std::cerr << "Blad: --gen-max-count musi byc >= 0\n";
+                    return std::nullopt;
+                }
+            }
             else if (arg == "--gen-from-dyrektor") {
                 config.spawn_generator = true;
+            }
+            else if (arg == "--one-day") {
+                config.one_day = true;
             }
             else if (arg == "--dept" && i + 1 < argc) {
                 auto role_opt = string_to_urzednik_role(argv[++i]);
@@ -196,7 +212,9 @@ int main(int argc, char* argv[]) {
         " time_mul=" + std::to_string(config->time_mul) +
         " gen_min_delay=" + std::to_string(config->gen_min_delay_sec) +
         " gen_max_delay=" + std::to_string(config->gen_max_delay_sec) +
-        " gen_from_dyrektor=" + std::to_string(config->spawn_generator)
+        " gen_max_count=" + std::to_string(config->gen_max_count) +
+        " gen_from_dyrektor=" + std::to_string(config->spawn_generator) +
+        " one_day=" + std::to_string(config->one_day)
     );
 
     switch (config->role) {
@@ -210,7 +228,8 @@ int main(int argc, char* argv[]) {
                 static_cast<uint32_t>(config->X5)
             };
             dyrektor_main({config->Tp, config->Tk}, department_limits, config->time_mul,
-                          config->gen_min_delay_sec, config->gen_max_delay_sec, config->spawn_generator);
+                          config->gen_min_delay_sec, config->gen_max_delay_sec, config->gen_max_count,
+                          config->spawn_generator, config->one_day);
             break;
         }
         case Identity::Rejestracja:
@@ -231,7 +250,8 @@ int main(int argc, char* argv[]) {
             petent_main(*config->urzednik_role);
             break;
         case Identity::Generator:
-            generator_main(config->gen_min_delay_sec, config->gen_max_delay_sec, config->time_mul);
+            generator_main(config->gen_min_delay_sec, config->gen_max_delay_sec, config->time_mul,
+                           config->gen_max_count);
             break;
     }
 

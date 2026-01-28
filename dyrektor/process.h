@@ -14,6 +14,8 @@ struct ProcessConfig {
     int time_mul;
     int gen_min_delay_sec;
     int gen_max_delay_sec;
+    int gen_max_count;
+    bool one_day;
 };
 
 struct UrzednikProcess {

@@ -35,6 +35,13 @@ namespace process {
         args.emplace_back(std::to_string(config.gen_min_delay_sec));
         args.emplace_back("--gen-max-delay");
         args.emplace_back(std::to_string(config.gen_max_delay_sec));
+        if (config.gen_max_count >= 0) {
+            args.emplace_back("--gen-max-count");
+            args.emplace_back(std::to_string(config.gen_max_count));
+        }
+        if (config.one_day) {
+            args.emplace_back("--one-day");
+        }
         return args;
     }
 

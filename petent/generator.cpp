@@ -71,7 +71,7 @@ static void sleep_scaled_seconds(int seconds, int time_mul) {
     std::this_thread::sleep_for(std::chrono::milliseconds(base_ms * seconds));
 }
 
-int generator_main(int min_delay_sec, int max_delay_sec, int time_mul) {
+int generator_main(int min_delay_sec, int max_delay_sec, int time_mul, int max_count) {
     std::signal(SIGTERM, handle_shutdown_signal);
     std::signal(SIGINT, handle_shutdown_signal);
 
@@ -89,10 +89,24 @@ int generator_main(int min_delay_sec, int max_delay_sec, int time_mul) {
         max_delay_sec = min_delay_sec;
     }
 
+    int generated_count = 0;
+    if (max_count == 0) {
+        Logger::log(LogSeverity::Notice, Identity::Generator, "Limit petentow ustawiony na 0 - generator konczy prace.");
+        ipc::shm::detach(shared_state);
+        return 0;
+    }
+
     while (generator_running) {
+        if (max_count > 0 && generated_count >= max_count) {
+            Logger::log(LogSeverity::Notice, Identity::Generator,
+                        "Osiagnieto limit generowania petentow: " + std::to_string(max_count) + ".");
+            break;
+        }
         if (shared_state->office_status == OfficeStatus::Open) {
             if (spawn_petent() == -1) {
                 Logger::log(LogSeverity::Err, Identity::Generator, "Nie udalo sie utworzyc procesu petenta.");
+            } else {
+                generated_count++;
             }
             int delay_sec = rng::random_int(min_delay_sec, max_delay_sec);
             sleep_scaled_seconds(delay_sec, time_mul);

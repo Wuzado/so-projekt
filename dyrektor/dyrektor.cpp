@@ -94,7 +94,7 @@ using process::UrzednikProcess;
 using process::UrzednikQueue;
 
 int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& department_limits, int time_mul,
-                  int gen_min_delay_sec, int gen_max_delay_sec, bool spawn_generator) {
+                  int gen_min_delay_sec, int gen_max_delay_sec, int gen_max_count, bool spawn_generator, bool one_day) {
     std::signal(SIGINT, handle_shutdown_signal);
     std::signal(SIGTERM, handle_shutdown_signal);
     std::signal(SIGUSR2, handle_shutdown_signal);
@@ -200,7 +200,8 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
         return 1;
     }
 
-    process::ProcessConfig process_config{hours_open, department_limits, time_mul, gen_min_delay_sec, gen_max_delay_sec};
+    process::ProcessConfig process_config{hours_open, department_limits, time_mul, gen_min_delay_sec, gen_max_delay_sec,
+                                          gen_max_count, one_day};
 
     std::vector<UrzednikProcess> urzednik_pids;
     pid_t generator_pid = -1;
@@ -263,6 +264,12 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
             shared_state->current_queue_length = 0;
             for (auto& counter : shared_state->ticket_counters) {
                 counter = 0;
+            }
+
+            if (one_day) {
+                Logger::log(LogSeverity::Notice, Identity::Dyrektor, "Tryb testowy: konczenie po jednym dniu.");
+                simulation_running = false;
+                break;
             }
 
             if (!process::spawn_urzednicy(urzednik_pids, process_config)) {
