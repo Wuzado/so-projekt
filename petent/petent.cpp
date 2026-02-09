@@ -18,9 +18,9 @@ static void log_evacuation() {
 }
 
 int petent_main(UrzednikRole department) {
-    std::signal(SIGUSR2, handle_evacuation_signal);
-    std::signal(SIGTERM, handle_evacuation_signal);
-    std::signal(SIGINT, handle_evacuation_signal);
+    ipc::install_signal_handler(SIGUSR2, handle_evacuation_signal);
+    ipc::install_signal_handler(SIGTERM, handle_evacuation_signal);
+    ipc::install_signal_handler(SIGINT, handle_evacuation_signal);
 
     Logger::log(LogSeverity::Info, Identity::Petent, "Petent uruchomiony.");
 
@@ -98,6 +98,11 @@ int petent_main(UrzednikRole department) {
 
     TicketIssuedMsg issued{};
     while (true) {
+        if (petent_evacuating) {
+            log_evacuation();
+            ipc::shm::detach(shared_state);
+            return 0;
+        }
         int rc = ipc::msg::receive<TicketIssuedMsg>(msg_req_id, static_cast<long>(petent_id), &issued, 0);
         if (rc == -1) {
             if (errno == EINTR) {
@@ -118,13 +123,13 @@ int petent_main(UrzednikRole department) {
 
     if (issued.reject_reason == TicketRejectReason::OfficeClosed) {
         Logger::log(LogSeverity::Notice, Identity::Petent, "Urzad zamkniety - bilet nie zostal wydany.");
-        ipc::sem::post(sem_id, 0);
+        // Building slot already freed by rejestracja
         ipc::shm::detach(shared_state);
         return 0;
     }
     if (issued.reject_reason == TicketRejectReason::LimitReached) {
         Logger::log(LogSeverity::Notice, Identity::Petent, "Brak wolnych terminow - bilet nie zostal wydany.");
-        ipc::sem::post(sem_id, 0);
+        // Building slot already freed by rejestracja
         ipc::shm::detach(shared_state);
         return 0;
     }
@@ -152,6 +157,11 @@ int petent_main(UrzednikRole department) {
 
     ServiceDoneMsg done{};
     while (true) {
+        if (petent_evacuating) {
+            log_evacuation();
+            ipc::shm::detach(shared_state);
+            return 0;
+        }
         int rc = ipc::msg::receive<ServiceDoneMsg>(msg_req_id, static_cast<long>(petent_id), &done, 0);
         if (rc == -1) {
             if (errno == EINTR) {

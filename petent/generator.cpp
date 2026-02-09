@@ -72,8 +72,9 @@ static void sleep_scaled_seconds(int seconds, int time_mul) {
 }
 
 int generator_main(int min_delay_sec, int max_delay_sec, int time_mul, int max_count) {
-    std::signal(SIGTERM, handle_shutdown_signal);
-    std::signal(SIGINT, handle_shutdown_signal);
+    ipc::install_signal_handler(SIGTERM, handle_shutdown_signal);
+    signal(SIGINT, SIG_IGN);
+    signal(SIGUSR2, SIG_IGN);
 
     Logger::log(LogSeverity::Info, Identity::Generator, "Generator petentow uruchomiony.");
 
@@ -117,7 +118,22 @@ int generator_main(int min_delay_sec, int max_delay_sec, int time_mul, int max_c
         reap_children();
     }
 
-    reap_children();
+    // Send SIGUSR2 again to the process group as backup.
+    // Children will inherit SIG_IGN for SIGUSR2,
+    // and they may have installed their handlers after the dyrektor signal.
+    killpg(getpgrp(), SIGUSR2);
+
+    // Wait for all children to exit.
+    while (true) {
+        int status = 0;
+        pid_t wpid = waitpid(-1, &status, 0);
+        if (wpid == -1) {
+            if (errno == ECHILD) break; // no more children
+            if (errno == EINTR) continue;
+            break;
+        }
+    }
+
     ipc::shm::detach(shared_state);
     Logger::log(LogSeverity::Info, Identity::Generator, "Generator petentow zakonczyl prace.");
     return 0;

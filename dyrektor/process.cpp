@@ -129,9 +129,9 @@ namespace process {
         if (pid <= 0) {
             return;
         }
-        if (kill(pid, SIGTERM) == -1) {
-            perror("kill failed");
-        }
+        
+        // Send SIGTERM as backup (pg SIGUSR2 + terminal SIGINT).
+        kill(pid, SIGTERM);
         if (waitpid(pid, nullptr, 0) == -1 && errno != ECHILD) {
             perror("waitpid failed");
         }
@@ -248,7 +248,7 @@ namespace process {
         shutdown_msg.petent_id = 0;
         shutdown_msg.department = UrzednikRole::SA;
         for (int i = 0; i < count; ++i) {
-            if (ipc::msg::send<TicketRequestMsg>(msg_req_id, 1, shutdown_msg) == -1) {
+            if (ipc::msg::send<TicketRequestMsg>(msg_req_id, 1, shutdown_msg, IPC_NOWAIT) == -1) {
                 break;
             }
         }
@@ -264,7 +264,7 @@ namespace process {
         shutdown_msg.department = role;
         shutdown_msg.redirected_from_sa = 0;
         for (int i = 0; i < count; ++i) {
-            if (ipc::msg::send<TicketIssuedMsg>(msg_id, 1, shutdown_msg) == -1) {
+            if (ipc::msg::send<TicketIssuedMsg>(msg_id, 1, shutdown_msg, IPC_NOWAIT) == -1) {
                 break;
             }
         }

@@ -51,9 +51,10 @@ static uint32_t resolve_report_day(const SharedState* shared_state) {
 }
 
 int urzednik_main(UrzednikRole role) {
-    std::signal(SIGTERM, handle_shutdown_signal);
-    std::signal(SIGINT, handle_shutdown_signal);
-    std::signal(SIGUSR1, handle_finish_signal);
+    ipc::install_signal_handler(SIGTERM, handle_shutdown_signal);
+    ipc::install_signal_handler(SIGUSR1, handle_finish_signal);
+    signal(SIGINT, SIG_IGN);
+    signal(SIGUSR2, SIG_IGN);
 
     Logger::log(LogSeverity::Info, Identity::Urzednik, role, "Urzednik uruchomiony.");
 
@@ -154,7 +155,9 @@ int urzednik_main(UrzednikRole role) {
                     redirect_msg.redirected_from_sa = 1;
                     redirect_msg.reject_reason = TicketRejectReason::None;
 
-                        if (ipc::msg::send<TicketIssuedMsg>(target_msg_id, kUrzednikQueueType, redirect_msg) == -1) {
+                        // Use IPC_NOWAIT when shutting down to avoid blocking on a full queue
+                        int redir_flags = stop_after_current ? IPC_NOWAIT : 0;
+                        if (ipc::msg::send<TicketIssuedMsg>(target_msg_id, kUrzednikQueueType, redirect_msg, redir_flags) == -1) {
                             std::string error =
                                 "Blad wyslania przekierowania dla petenta " + std::to_string(ticket.petent_id);
                             Logger::log(LogSeverity::Err, Identity::Urzednik, role, error);
@@ -182,7 +185,9 @@ int urzednik_main(UrzednikRole role) {
                 ServiceDoneMsg done{};
                 done.petent_id = ticket.petent_id;
                 done.department = role;
-                if (ipc::msg::send<ServiceDoneMsg>(msg_req_id, static_cast<long>(ticket.petent_id), done) == -1) {
+                // Use IPC_NOWAIT when shutting down to avoid blocking on a full queue
+                int send_flags = stop_after_current ? IPC_NOWAIT : 0;
+                if (ipc::msg::send<ServiceDoneMsg>(msg_req_id, static_cast<long>(ticket.petent_id), done, send_flags) == -1) {
                     Logger::log(LogSeverity::Err, Identity::Urzednik, role,
                                 "Blad wyslania potwierdzenia obslugi petenta.");
                 }

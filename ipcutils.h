@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cerrno>
 #include <ctime>
+#include <csignal>
 #include <pthread.h>
 #include <sys/ipc.h>
 #include <sys/msg.h>
@@ -14,6 +15,19 @@
 #include "common.h"
 
 namespace ipc {
+
+    // Install a signal handler without SA_RESTART
+    inline int install_signal_handler(int signum, void (*handler)(int)) {
+        struct sigaction sa = {};
+        sa.sa_handler = handler;
+        sigemptyset(&sa.sa_mask);
+        sa.sa_flags = 0; // w/o SA_RESTART
+        if (sigaction(signum, &sa, nullptr) == -1) {
+            perror("sigaction failed");
+            return -1;
+        }
+        return 0;
+    }
 
     constexpr const char* IPC_LOCK_FILE = "/tmp/so_projekt_ipc.lock"; // Must be created by Director at startup!
 

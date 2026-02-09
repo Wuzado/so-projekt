@@ -32,9 +32,10 @@ static bool is_valid_department(UrzednikRole department) {
 }
 
 int rejestracja_main() {
-    std::signal(SIGTERM, handle_shutdown_signal);
-    std::signal(SIGINT, handle_shutdown_signal);
-    std::signal(SIGUSR1, handle_finish_signal);
+    ipc::install_signal_handler(SIGTERM, handle_shutdown_signal);
+    ipc::install_signal_handler(SIGUSR1, handle_finish_signal);
+    signal(SIGINT, SIG_IGN);
+    signal(SIGUSR2, SIG_IGN);
 
     Logger::log(LogSeverity::Info, Identity::Rejestracja, "Rejestracja uruchomiona.");
 
@@ -56,6 +57,10 @@ int rejestracja_main() {
     }
 
     while (rejestracja_running) {
+        if (stop_after_current) {
+            break;
+        }
+
         TicketRequestMsg request{};
         int rc = ipc::msg::receive<TicketRequestMsg>(msg_req_id, kTicketRequestType, &request, 0);
         if (rc == -1) {

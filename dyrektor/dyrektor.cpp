@@ -5,6 +5,7 @@
 #include <cstring>
 #include <fcntl.h>
 #include <pthread.h>
+#include <signal.h>
 #include <sys/msg.h>
 #include <sys/wait.h>
 #include <thread>
@@ -18,6 +19,14 @@
 #include "process.h"
 
 static void handle_shutdown_signal(int) { simulation_running = false; }
+
+// Drain all messages from a SysV message queue
+static void drain_msg_queue(int msqid) {
+    struct { long mtype; char data[256]; } buf;
+    while (msgrcv(msqid, &buf, sizeof(buf.data), 0, IPC_NOWAIT | MSG_NOERROR) != -1) {
+        // keep draining
+    }
+}
 
 void cleanup(SharedState* shared_state, int shm_id, int msg_req_id, int msg_sa_id, int msg_sc_id, int msg_km_id,
              int msg_ml_id, int msg_pd_id, int sem_id, int lock_file) {
@@ -95,9 +104,9 @@ using process::UrzednikQueue;
 
 int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& department_limits, int time_mul,
                   int gen_min_delay_sec, int gen_max_delay_sec, int gen_max_count, bool spawn_generator, bool one_day) {
-    std::signal(SIGINT, handle_shutdown_signal);
-    std::signal(SIGTERM, handle_shutdown_signal);
-    std::signal(SIGUSR2, handle_shutdown_signal);
+    ipc::install_signal_handler(SIGINT, handle_shutdown_signal);
+    ipc::install_signal_handler(SIGTERM, handle_shutdown_signal);
+    ipc::install_signal_handler(SIGUSR2, handle_shutdown_signal);
 
     process::group::init_self();
 
@@ -257,9 +266,15 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
             Logger::log(LogSeverity::Notice, Identity::Dyrektor, "Restart dzienny urzednikow i rejestracji.");
 
             process::stop_daily_rejestracja(rejestracja_pids);
+
+            drain_msg_queue(msg_req_id);
+
             process::stop_daily_urzednik(urzednik_pids);
 
             drain_unserved_tickets(urzednik_queues, report_day);
+
+            // Reset cap to avoid leaks
+            ipc::sem::set_val(sem_id, 0, static_cast<int>(queue_slots));
 
             shared_state->current_queue_length = 0;
             for (auto& counter : shared_state->ticket_counters) {
@@ -304,7 +319,8 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
         while (current > target) {
             pid_t pid = rejestracja_pids.back();
             rejestracja_pids.pop_back();
-            process::send_rejestracja_shutdown(msg_req_id, 1);
+
+            kill(pid, SIGUSR1);
             process::terminate_rejestracja(pid);
             current = static_cast<short>(rejestracja_pids.size());
         }
@@ -318,17 +334,32 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
     }
 
-    process::group::signal_self(SIGUSR2);
     stop_clock(clock_thread);
 
+    // Shutdown sequence: Petent -> Urzednik & Rejestracja -> Dyrektor.
+
+    // 1. Send SIGUSR2 to the process group to evacuate petent processes.
+    //    Generator, urzedniks, and rejestracja ignore SIGUSR2.
+    signal(SIGUSR2, SIG_IGN);
+    process::group::signal_self(SIGUSR2);
+
+    // 2. Stop the generator and wait for it (generator waits for petent processes).
+    if (generator_pid != -1) {
+        process::terminate_generator(generator_pid);
+    }
+
+    // 3. Drain all message queues to make room for shutdown sentinel messages.
+    drain_msg_queue(msg_req_id);
+    for (const auto& q : urzednik_queues) {
+        drain_msg_queue(q.msg_id);
+    }
+
+    // 4. Shut down urzednik and rejestracja processes.
     process::send_rejestracja_shutdown(msg_req_id, static_cast<int>(rejestracja_pids.size()));
     process::send_urzednik_shutdowns(urzednik_queues);
 
     process::terminate_rejestracja_all(rejestracja_pids);
     process::terminate_urzednik_all(urzednik_pids);
-    if (generator_pid != -1) {
-        process::terminate_generator(generator_pid);
-    }
 
     cleanup_clock();
     cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, sem_id, lock_file);
