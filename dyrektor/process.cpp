@@ -81,7 +81,7 @@ namespace process {
         return pid;
     }
 
-    static void terminate_urzednik(pid_t pid) {
+    static void wait_urzednik(pid_t pid) {
         if (pid <= 0) {
             return;
         }
@@ -118,7 +118,7 @@ namespace process {
         return pid;
     }
 
-    void terminate_rejestracja(pid_t pid) {
+    void wait_rejestracja(pid_t pid) {
         if (pid <= 0) {
             return;
         }
@@ -226,16 +226,16 @@ namespace process {
         urzednik_pids.clear();
     }
 
-    void terminate_rejestracja_all(std::vector<pid_t>& rejestracja_pids) {
+    void wait_rejestracja_all(std::vector<pid_t>& rejestracja_pids) {
         for (pid_t pid : rejestracja_pids) {
-            terminate_rejestracja(pid);
+            wait_rejestracja(pid);
         }
         rejestracja_pids.clear();
     }
 
-    void terminate_urzednik_all(std::vector<UrzednikProcess>& urzednik_pids) {
+    void wait_urzednik_all(std::vector<UrzednikProcess>& urzednik_pids) {
         for (const auto& proc : urzednik_pids) {
-            terminate_urzednik(proc.pid);
+            wait_urzednik(proc.pid);
         }
         urzednik_pids.clear();
     }

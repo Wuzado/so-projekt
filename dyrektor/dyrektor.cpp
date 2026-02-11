@@ -233,7 +233,7 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
     std::vector<pid_t> rejestracja_pids;
     if (!process::spawn_rejestracja_group(rejestracja_pids, process_config)) {
         process::send_urzednik_shutdowns(urzednik_queues);
-        process::terminate_urzednik_all(urzednik_pids);
+        process::wait_urzednik_all(urzednik_pids);
         if (generator_pid != -1) {
             process::terminate_generator(generator_pid);
         }
@@ -247,8 +247,8 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
     if (start_clock(shared_state, hours_open, &clock_thread) != 0) {
         process::send_rejestracja_shutdown(msg_req_id, static_cast<int>(rejestracja_pids.size()));
         process::send_urzednik_shutdowns(urzednik_queues);
-        process::terminate_rejestracja_all(rejestracja_pids);
-        process::terminate_urzednik_all(urzednik_pids);
+        process::wait_rejestracja_all(rejestracja_pids);
+        process::wait_urzednik_all(urzednik_pids);
         if (generator_pid != -1) {
             process::terminate_generator(generator_pid);
         }
@@ -294,7 +294,7 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
             }
             if (!process::spawn_rejestracja_group(rejestracja_pids, process_config)) {
                 Logger::log(LogSeverity::Emerg, Identity::Dyrektor, "Nie udalo sie odtworzyc rejestracji po dniu.");
-                process::terminate_urzednik_all(urzednik_pids);
+                process::wait_urzednik_all(urzednik_pids);
                 simulation_running = false;
                 break;
             }
@@ -321,7 +321,7 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
             rejestracja_pids.pop_back();
 
             kill(pid, SIGUSR1);
-            process::terminate_rejestracja(pid);
+            process::wait_rejestracja(pid);
             current = static_cast<short>(rejestracja_pids.size());
         }
 
@@ -358,8 +358,8 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
     process::send_rejestracja_shutdown(msg_req_id, static_cast<int>(rejestracja_pids.size()));
     process::send_urzednik_shutdowns(urzednik_queues);
 
-    process::terminate_rejestracja_all(rejestracja_pids);
-    process::terminate_urzednik_all(urzednik_pids);
+    process::wait_rejestracja_all(rejestracja_pids);
+    process::wait_urzednik_all(urzednik_pids);
 
     cleanup_clock();
     cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, sem_id, lock_file);
