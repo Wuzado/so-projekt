@@ -57,6 +57,8 @@ private:
                 return "REJESTRACJA";
             case Identity::Generator:
                 return "GENERATOR";
+            case Identity::Kasa:
+                return "KASA";
             default:
                 return "UNKNOWN";
         }

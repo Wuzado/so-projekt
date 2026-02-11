@@ -190,6 +190,52 @@ int urzednik_main(UrzednikRole role) {
         }
 
         if (!redirected) {
+            if (role != UrzednikRole::SA && shared_state->office_status == OfficeStatus::Open && !stop_after_current) {
+                int kasa_roll = rng::random_int(1, 100);
+                if (kasa_roll <= 10) {
+                    Logger::log(LogSeverity::Notice, Identity::Urzednik, role,
+                                "Petent " + std::to_string(ticket.petent_id) + " skierowany do kasy.");
+
+                    if (msg_req_id != -1) {
+                        ServiceDoneMsg kasa_msg{};
+                        kasa_msg.petent_id = ticket.petent_id;
+                        kasa_msg.department = role;
+                        kasa_msg.action = ServiceAction::GoToKasa;
+                        if (ipc::msg::send<ServiceDoneMsg>(msg_req_id, static_cast<long>(ticket.petent_id), kasa_msg, 0) == -1) {
+                            Logger::log(LogSeverity::Err, Identity::Urzednik, role,
+                                        "Blad wyslania skierowania do kasy.");
+                        } else {
+                            KasaRequestMsg ret{};
+                            bool returned = false;
+                            while (!returned) {
+                                int rrc = ipc::msg::receive<KasaRequestMsg>(msg_id, kKasaReturnQueueType, &ret, 0);
+                                if (rrc == -1) {
+                                    if (errno == EINTR) {
+                                        if (!urzednik_running || stop_after_current) {
+                                            break;
+                                        }
+                                        continue;
+                                    }
+                                    Logger::log(LogSeverity::Err, Identity::Urzednik, role,
+                                                "Blad oczekiwania na powrot petenta z kasy.");
+                                    break;
+                                }
+                                if (ret.petent_id == ticket.petent_id) {
+                                    returned = true;
+                                } else {
+                                    ipc::msg::send<KasaRequestMsg>(msg_id, kKasaReturnQueueType, ret, IPC_NOWAIT);
+                                }
+                            }
+
+                            if (returned) {
+                                Logger::log(LogSeverity::Info, Identity::Urzednik, role,
+                                            "Petent " + std::to_string(ticket.petent_id) + " wrocil z kasy.");
+                            }
+                        }
+                    }
+                }
+            }
+
             if (ticket.is_vip) {
                 Logger::log(LogSeverity::Info, Identity::Urzednik, role,
                             "Zakonczono obsluge petenta VIP " + std::to_string(ticket.petent_id) + ".");
@@ -202,6 +248,7 @@ int urzednik_main(UrzednikRole role) {
                 ServiceDoneMsg done{};
                 done.petent_id = ticket.petent_id;
                 done.department = role;
+                done.action = ServiceAction::Complete;
                 // Use IPC_NOWAIT when shutting down to avoid blocking on a full queue
                 int send_flags = stop_after_current ? IPC_NOWAIT : 0;
                 if (ipc::msg::send<ServiceDoneMsg>(msg_req_id, static_cast<long>(ticket.petent_id), done, send_flags) == -1) {

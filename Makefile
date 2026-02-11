@@ -1,6 +1,6 @@
 CXX = g++
 CXXFLAGS = -std=c++17 -Wall -Wextra -pthread -I.
-SRCS = main.cpp dyrektor/dyrektor.cpp dyrektor/clock.cpp dyrektor/process.cpp petent/petent.cpp petent/generator.cpp petent/dziecko.cpp rejestracja/rejestracja.cpp urzednik/urzednik.cpp
+SRCS = main.cpp dyrektor/dyrektor.cpp dyrektor/clock.cpp dyrektor/process.cpp petent/petent.cpp petent/generator.cpp petent/dziecko.cpp rejestracja/rejestracja.cpp urzednik/urzednik.cpp kasa/kasa.cpp
 TARGET = so_projekt
 
 $(TARGET): $(SRCS)

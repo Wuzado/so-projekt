@@ -3,6 +3,7 @@
 #include <optional>
 #include "common.h"
 #include "dyrektor/dyrektor.h"
+#include "kasa/kasa.h"
 #include "logger.h"
 #include "petent/generator.h"
 #include "petent/petent.h"
@@ -271,6 +272,9 @@ int main(int argc, char* argv[]) {
         case Identity::Generator:
             generator_main(config->gen_min_delay_sec, config->gen_max_delay_sec, config->time_mul,
                            config->gen_max_count);
+            break;
+        case Identity::Kasa:
+            kasa_main();
             break;
     }
 

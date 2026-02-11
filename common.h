@@ -12,7 +12,7 @@
 
 typedef std::pair<short, short> HoursOpen; // tp, tk
 
-enum class Identity { Petent, Urzednik, Dyrektor, Rejestracja, Generator };
+enum class Identity { Petent, Urzednik, Dyrektor, Rejestracja, Generator, Kasa };
 
 inline std::optional<Identity> string_to_identity(std::string_view str) {
     if (str == "petent") return Identity::Petent;
@@ -20,6 +20,7 @@ inline std::optional<Identity> string_to_identity(std::string_view str) {
     if (str == "dyrektor") return Identity::Dyrektor;
     if (str == "rejestracja") return Identity::Rejestracja;
     if (str == "generator") return Identity::Generator;
+    if (str == "kasa") return Identity::Kasa;
     return std::nullopt;
 }
 
@@ -82,7 +83,17 @@ struct TicketIssuedMsg {
     uint8_t is_vip; // boolean - priority queue flag
 };
 
+enum class ServiceAction : uint8_t { Complete, GoToKasa };
+
 struct ServiceDoneMsg {
+    uint32_t petent_id;
+    UrzednikRole department; // uint8_t
+    ServiceAction action;
+    uint8_t padding[2]; // for explicit alignment
+};
+
+// Sent by petent to kasa queue, and back to urzednik queue
+struct KasaRequestMsg {
     uint32_t petent_id;
     UrzednikRole department; // uint8_t
     uint8_t padding[3]; // for explicit alignment
@@ -93,6 +104,8 @@ struct ServiceDoneMsg {
 constexpr long kVipQueueType = 1;
 constexpr long kNormalQueueType = 2;
 constexpr long kTicketRequestType = 1;
+constexpr long kKasaReturnQueueType = 3; // returning petents
+constexpr long kKasaRequestType = 1; // payment requests
 
 namespace rng {
     inline int random_int(int min_inclusive, int max_inclusive) {

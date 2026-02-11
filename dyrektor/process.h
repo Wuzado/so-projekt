@@ -32,8 +32,10 @@ struct UrzednikQueue {
 
 pid_t spawn_rejestracja(const ProcessConfig& config);
 pid_t spawn_generator(const ProcessConfig& config);
+pid_t spawn_kasa(const ProcessConfig& config);
 void wait_rejestracja(pid_t pid);
 void terminate_generator(pid_t pid);
+void terminate_kasa(pid_t pid);
 
 bool spawn_rejestracja_group(std::vector<pid_t>& rejestracja_pids, const ProcessConfig& config);
 bool spawn_urzednicy(std::vector<UrzednikProcess>& urzednik_pids, const ProcessConfig& config);

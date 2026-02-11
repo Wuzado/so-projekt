@@ -56,7 +56,8 @@ namespace ipc {
         MsgQueueSC = 'C',
         MsgQueueKM = 'K',
         MsgQueueML = 'L',
-        MsgQueuePD = 'P'
+        MsgQueuePD = 'P',
+        MsgQueueKasa = '$'
     };
 
     // Generate SysV IPC key using ftok()

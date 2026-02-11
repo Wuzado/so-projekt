@@ -139,6 +139,31 @@ namespace process {
         }
     }
 
+    pid_t spawn_kasa(const ProcessConfig& config) {
+        pid_t pid = fork();
+        if (pid == -1) {
+            perror("fork failed");
+            return -1;
+        }
+        if (pid == 0) {
+            std::vector<std::string> args = build_common_args("kasa", config);
+            exec_with_args(args);
+            perror("exec failed");
+            _exit(1);
+        }
+        return pid;
+    }
+
+    void terminate_kasa(pid_t pid) {
+        if (pid <= 0) {
+            return;
+        }
+        kill(pid, SIGUSR1);
+        if (waitpid(pid, nullptr, 0) == -1 && errno != ECHILD) {
+            perror("waitpid failed");
+        }
+    }
+
     bool spawn_rejestracja_group(std::vector<pid_t>& rejestracja_pids, const ProcessConfig& config) {
         pid_t first_pid = spawn_rejestracja(config);
         if (first_pid == -1) {

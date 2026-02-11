@@ -29,7 +29,7 @@ static void drain_msg_queue(int msqid) {
 }
 
 void cleanup(SharedState* shared_state, int shm_id, int msg_req_id, int msg_sa_id, int msg_sc_id, int msg_km_id,
-             int msg_ml_id, int msg_pd_id, int sem_id, int lock_file) {
+             int msg_ml_id, int msg_pd_id, int msg_kasa_id, int sem_id, int lock_file) {
     ipc::shm::detach(shared_state);
     ipc::shm::remove(shm_id);
     if (msg_req_id != -1) {
@@ -49,6 +49,9 @@ void cleanup(SharedState* shared_state, int shm_id, int msg_req_id, int msg_sa_i
     }
     if (msg_pd_id != -1) {
         ipc::msg::remove(msg_pd_id);
+    }
+    if (msg_kasa_id != -1) {
+        ipc::msg::remove(msg_kasa_id);
     }
     if (sem_id != -1) {
         ipc::sem::remove(sem_id);
@@ -153,13 +156,13 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
 
     key_t msg_req_key = ipc::make_key(ipc::KeyType::MsgQueueRejestracja);
     if (msg_req_key == -1) {
-        cleanup(shared_state, shm_id, -1, -1, -1, -1, -1, -1, -1, lock_file);
+        cleanup(shared_state, shm_id, -1, -1, -1, -1, -1, -1, -1, -1, lock_file);
         return 1;
     }
 
     int msg_req_id = ipc::helper::create_or_reset_msg(msg_req_key);
     if (msg_req_id == -1) {
-        cleanup(shared_state, shm_id, -1, -1, -1, -1, -1, -1, -1, lock_file);
+        cleanup(shared_state, shm_id, -1, -1, -1, -1, -1, -1, -1, -1, lock_file);
         return 1;
     }
 
@@ -169,7 +172,7 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
     key_t msg_ml_key = ipc::make_key(ipc::KeyType::MsgQueueML);
     key_t msg_pd_key = ipc::make_key(ipc::KeyType::MsgQueuePD);
     if (msg_sa_key == -1 || msg_sc_key == -1 || msg_km_key == -1 || msg_ml_key == -1 || msg_pd_key == -1) {
-        cleanup(shared_state, shm_id, msg_req_id, -1, -1, -1, -1, -1, -1, lock_file);
+        cleanup(shared_state, shm_id, msg_req_id, -1, -1, -1, -1, -1, -1, -1, lock_file);
         return 1;
     }
 
@@ -179,7 +182,18 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
     int msg_ml_id = ipc::helper::create_or_reset_msg(msg_ml_key);
     int msg_pd_id = ipc::helper::create_or_reset_msg(msg_pd_key);
     if (msg_sa_id == -1 || msg_sc_id == -1 || msg_km_id == -1 || msg_ml_id == -1 || msg_pd_id == -1) {
-        cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, -1, lock_file);
+        cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, -1, -1, lock_file);
+        return 1;
+    }
+
+    key_t msg_kasa_key = ipc::make_key(ipc::KeyType::MsgQueueKasa);
+    if (msg_kasa_key == -1) {
+        cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, -1, -1, lock_file);
+        return 1;
+    }
+    int msg_kasa_id = ipc::helper::create_or_reset_msg(msg_kasa_key);
+    if (msg_kasa_id == -1) {
+        cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, -1, -1, lock_file);
         return 1;
     }
 
@@ -190,13 +204,13 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
 
     key_t sem_key = ipc::make_key(ipc::KeyType::SemaphoreSet);
     if (sem_key == -1) {
-        cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, -1, lock_file);
+        cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, msg_kasa_id, -1, lock_file);
         return 1;
     }
 
     int sem_id = ipc::helper::create_or_reset_sem(sem_key, 2);
     if (sem_id == -1) {
-        cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, -1, lock_file);
+        cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, msg_kasa_id, -1, lock_file);
         return 1;
     }
 
@@ -206,7 +220,7 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
     sem_vals[0] = queue_slots;
     sem_vals[1] = 1;
     if (ipc::sem::set_all(sem_id, sem_vals) == -1) {
-        cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, sem_id,
+        cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, msg_kasa_id, sem_id,
                 lock_file);
         return 1;
     }
@@ -216,19 +230,30 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
 
     std::vector<UrzednikProcess> urzednik_pids;
     pid_t generator_pid = -1;
+    pid_t kasa_pid = -1;
     if (spawn_generator) {
         generator_pid = process::spawn_generator(process_config);
         if (generator_pid == -1) {
-            cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, sem_id,
+            cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, msg_kasa_id, sem_id,
                     lock_file);
             return 1;
         }
+    }
+    kasa_pid = process::spawn_kasa(process_config);
+    if (kasa_pid == -1) {
+        if (generator_pid != -1) {
+            process::terminate_generator(generator_pid);
+        }
+        cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, msg_kasa_id, sem_id,
+                lock_file);
+        return 1;
     }
     if (!process::spawn_urzednicy(urzednik_pids, process_config)) {
         if (generator_pid != -1) {
             process::terminate_generator(generator_pid);
         }
-        cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, sem_id,
+        process::terminate_kasa(kasa_pid);
+        cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, msg_kasa_id, sem_id,
                 lock_file);
         return 1;
     }
@@ -239,7 +264,8 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
         if (generator_pid != -1) {
             process::terminate_generator(generator_pid);
         }
-        cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, sem_id,
+        process::terminate_kasa(kasa_pid);
+        cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, msg_kasa_id, sem_id,
                 lock_file);
         return 1;
     }
@@ -254,7 +280,8 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
         if (generator_pid != -1) {
             process::terminate_generator(generator_pid);
         }
-        cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, sem_id,
+        process::terminate_kasa(kasa_pid);
+        cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, msg_kasa_id, sem_id,
                 lock_file);
         return 1;
     }
@@ -265,7 +292,7 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
     while (simulation_running.load()) {
         if (shared_state->day != last_day) {
             uint32_t report_day = last_day + 1;
-            Logger::log(LogSeverity::Notice, Identity::Dyrektor, "Restart dzienny urzednikow i rejestracji.");
+            Logger::log(LogSeverity::Notice, Identity::Dyrektor, "Restart dzienny urzednikow, rejestracji i kasy.");
 
             process::stop_daily_rejestracja(rejestracja_pids);
 
@@ -274,6 +301,10 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
             process::stop_daily_urzednik(urzednik_pids);
 
             drain_unserved_tickets(urzednik_queues, report_day);
+
+            process::terminate_kasa(kasa_pid);
+            kasa_pid = -1;
+            drain_msg_queue(msg_kasa_id);
 
             // Reset cap to avoid leaks
             ipc::sem::set_val(sem_id, 0, static_cast<int>(queue_slots));
@@ -285,6 +316,13 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
 
             if (one_day) {
                 Logger::log(LogSeverity::Notice, Identity::Dyrektor, "Tryb testowy: konczenie po jednym dniu.");
+                simulation_running = false;
+                break;
+            }
+
+            kasa_pid = process::spawn_kasa(process_config);
+            if (kasa_pid == -1) {
+                Logger::log(LogSeverity::Emerg, Identity::Dyrektor, "Nie udalo sie odtworzyc kasy po dniu.");
                 simulation_running = false;
                 break;
             }
@@ -352,18 +390,20 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
 
     // 3. Drain all message queues to make room for shutdown sentinel messages.
     drain_msg_queue(msg_req_id);
+    drain_msg_queue(msg_kasa_id);
     for (const auto& q : urzednik_queues) {
         drain_msg_queue(q.msg_id);
     }
 
-    // 4. Shut down urzednik and rejestracja processes.
+    // 4. Shut down urzednik and rejestracja processes, then kasa last.
     process::send_rejestracja_shutdown(msg_req_id, static_cast<int>(rejestracja_pids.size()));
     process::send_urzednik_shutdowns(urzednik_queues);
 
     process::wait_rejestracja_all(rejestracja_pids);
     process::wait_urzednik_all(urzednik_pids);
+    process::terminate_kasa(kasa_pid);
 
     cleanup_clock();
-    cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, sem_id, lock_file);
+    cleanup(shared_state, shm_id, msg_req_id, msg_sa_id, msg_sc_id, msg_km_id, msg_ml_id, msg_pd_id, msg_kasa_id, sem_id, lock_file);
     return 0;
 }

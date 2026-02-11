@@ -249,6 +249,73 @@ int petent_main(UrzednikRole department, bool is_vip, bool has_child) {
             ipc::shm::detach(shared_state);
             return 1;
         }
+
+        if (done.action == ServiceAction::GoToKasa) {
+            Logger::log(LogSeverity::Info, Identity::Petent,
+                        "Petent skierowany do kasy - udaje sie dokonac oplaty.");
+
+            int msg_kasa_id = ipc::helper::get_msg_queue(ipc::KeyType::MsgQueueKasa);
+            if (msg_kasa_id == -1) {
+                Logger::log(LogSeverity::Err, Identity::Petent, "Nie znaleziono kolejki kasy.");
+                cleanup_child();
+                ipc::shm::detach(shared_state);
+                return 1;
+            }
+
+            KasaRequestMsg pay{};
+            pay.petent_id = petent_id;
+            pay.department = done.department;
+            if (ipc::msg::send<KasaRequestMsg>(msg_kasa_id, kKasaRequestType, pay) == -1) {
+                Logger::log(LogSeverity::Err, Identity::Petent, "Blad wyslania zadania oplaty do kasy.");
+                cleanup_child();
+                ipc::shm::detach(shared_state);
+                return 1;
+            }
+
+            ServiceDoneMsg kasa_done{};
+            bool paid = false;
+            while (!paid) {
+                if (petent_evacuating) {
+                    log_evacuation();
+                    cleanup_child();
+                    ipc::shm::detach(shared_state);
+                    return 0;
+                }
+                int crc = ipc::msg::receive<ServiceDoneMsg>(msg_req_id, static_cast<long>(petent_id), &kasa_done, 0);
+                if (crc == -1) {
+                    if (errno == EINTR) {
+                        if (petent_evacuating) {
+                            log_evacuation();
+                            cleanup_child();
+                            ipc::shm::detach(shared_state);
+                            return 0;
+                        }
+                        continue;
+                    }
+                    Logger::log(LogSeverity::Err, Identity::Petent, "Blad odbioru potwierdzenia oplaty.");
+                    cleanup_child();
+                    ipc::shm::detach(shared_state);
+                    return 1;
+                }
+                paid = true;
+            }
+
+            Logger::log(LogSeverity::Info, Identity::Petent,
+                        "Petent dokonal oplaty - wraca do urzednika.");
+
+            KasaRequestMsg ret{};
+            ret.petent_id = petent_id;
+            ret.department = done.department;
+            if (ipc::msg::send<KasaRequestMsg>(dept_msg_id, kKasaReturnQueueType, ret) == -1) {
+                Logger::log(LogSeverity::Err, Identity::Petent, "Blad powiadomienia urzednika o powrocie z kasy.");
+                cleanup_child();
+                ipc::shm::detach(shared_state);
+                return 1;
+            }
+
+            continue;
+        }
+
         break;
     }
 
