@@ -97,7 +97,7 @@ int rejestracja_main() {
             TicketIssuedMsg rejected{};
             rejected.petent_id = request.petent_id;
             rejected.ticket_number = 0;
-            rejected.department = UrzednikRole::SA;
+            rejected.department = request.department;
             rejected.redirected_from_sa = 0;
             rejected.reject_reason = TicketRejectReason::OfficeClosed;
             if (ipc::msg::send<TicketIssuedMsg>(msg_req_id, static_cast<long>(request.petent_id), rejected) == -1) {
