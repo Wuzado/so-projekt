@@ -1,4 +1,5 @@
 #include "petent.h"
+#include "dziecko.h"
 #include <cerrno>
 #include <csignal>
 #include <cstring>
@@ -16,7 +17,7 @@ static void log_evacuation() {
     Logger::log(LogSeverity::Notice, Identity::Petent, "Ewakuacja - petent opuszcza budynek.");
 }
 
-int petent_main(UrzednikRole department, bool is_vip) {
+int petent_main(UrzednikRole department, bool is_vip, bool has_child) {
     ipc::install_signal_handler(SIGUSR2, handle_evacuation_signal);
     ipc::install_signal_handler(SIGTERM, handle_evacuation_signal);
     ipc::install_signal_handler(SIGINT, handle_evacuation_signal);
@@ -63,6 +64,43 @@ int petent_main(UrzednikRole department, bool is_vip) {
         return 1;
     }
 
+    // +1 capacity if has a child
+    if (has_child) {
+        if (ipc::sem::wait(sem_id, 0) == -1) {
+            if (errno == EINTR && petent_evacuating) {
+                log_evacuation();
+                ipc::sem::post(sem_id, 0); // release parent's slot
+                ipc::shm::detach(shared_state);
+                return 0;
+            }
+            Logger::log(LogSeverity::Err, Identity::Petent, "Blad oczekiwania na miejsce dla dziecka.");
+            ipc::sem::post(sem_id, 0); // release parent's slot
+            ipc::shm::detach(shared_state);
+            return 1;
+        }
+    }
+
+    // Child thread state
+    bool child_spawned = false;
+    ChildThreadData child_data{};
+    pthread_t child_thread{};
+
+    // Cleanup helper: signal child done, join, release extra capacity slot
+    auto cleanup_child = [&]() {
+        if (child_spawned) {
+            child_signal_done(&child_data);
+            child_join_and_cleanup(&child_data, child_thread);
+            ipc::sem::post(sem_id, 0); // release child's capacity slot
+        }
+    };
+
+    if (has_child) {
+        child_init(&child_data, getpid(), &petent_evacuating);
+        child_start(&child_data, &child_thread);
+        child_spawned = true;
+        Logger::log(LogSeverity::Info, Identity::Petent, "Petent wchodzi do urzedu z dzieckiem.");
+    }
+
     if (ipc::sem::wait(sem_id, 1) == -1) {
         Logger::log(LogSeverity::Err, Identity::Petent, "Blad blokady stanu wspoldzielonego.");
     }
@@ -78,7 +116,7 @@ int petent_main(UrzednikRole department, bool is_vip) {
     request.petent_id = petent_id;
     request.department = department;
     request.is_vip = is_vip;
-    request.has_child = rng::random_int(1, 100) <= 20 ? 1 : 0;
+    request.has_child = has_child ? 1 : 0;
 
     if (is_vip) {
         Logger::log(LogSeverity::Notice, Identity::Petent, "Petent VIP - wysylam zadanie biletu.");
@@ -93,6 +131,7 @@ int petent_main(UrzednikRole department, bool is_vip) {
             ipc::sem::post(sem_id, 1);
         }
         ipc::sem::post(sem_id, 0);
+        cleanup_child();
         ipc::shm::detach(shared_state);
         return 1;
     }
@@ -103,6 +142,7 @@ int petent_main(UrzednikRole department, bool is_vip) {
     while (true) {
         if (petent_evacuating) {
             log_evacuation();
+            cleanup_child();
             ipc::shm::detach(shared_state);
             return 0;
         }
@@ -111,6 +151,7 @@ int petent_main(UrzednikRole department, bool is_vip) {
             if (errno == EINTR) {
                 if (petent_evacuating) {
                     log_evacuation();
+                    cleanup_child();
                     ipc::shm::detach(shared_state);
                     return 0;
                 }
@@ -118,6 +159,7 @@ int petent_main(UrzednikRole department, bool is_vip) {
             }
             std::string error = "Blad odbioru biletu: " + std::string(std::strerror(errno));
             Logger::log(LogSeverity::Err, Identity::Petent, error);
+            cleanup_child();
             ipc::shm::detach(shared_state);
             return 1;
         }
@@ -126,18 +168,21 @@ int petent_main(UrzednikRole department, bool is_vip) {
 
     if (issued.reject_reason == TicketRejectReason::OfficeClosed) {
         Logger::log(LogSeverity::Notice, Identity::Petent, "Urzad zamkniety - bilet nie zostal wydany.");
-        // Building slot already freed by rejestracja
+        // Building slot already freed by rejestracja (parent only); free child slot
+        cleanup_child();
         ipc::shm::detach(shared_state);
         return 0;
     }
     if (issued.reject_reason == TicketRejectReason::LimitReached) {
         Logger::log(LogSeverity::Notice, Identity::Petent, "Brak wolnych terminow - bilet nie zostal wydany.");
-        // Building slot already freed by rejestracja
+        // Building slot already freed by rejestracja (parent only); free child slot
+        cleanup_child();
         ipc::shm::detach(shared_state);
         return 0;
     }
     if (issued.ticket_number == 0) {
         Logger::log(LogSeverity::Notice, Identity::Petent, "Bilet nie zostal wydany.");
+        cleanup_child();
         ipc::shm::detach(shared_state);
         return 0;
     }
@@ -145,6 +190,7 @@ int petent_main(UrzednikRole department, bool is_vip) {
     int dept_msg_id = ipc::helper::get_role_queue(issued.department);
     if (dept_msg_id == -1) {
         Logger::log(LogSeverity::Err, Identity::Petent, "Nie znaleziono kolejki urzednika.");
+        cleanup_child();
         ipc::shm::detach(shared_state);
         return 1;
     }
@@ -152,6 +198,7 @@ int petent_main(UrzednikRole department, bool is_vip) {
     long queue_mtype = issued.is_vip ? kVipQueueType : kNormalQueueType;
     if (ipc::msg::send<TicketIssuedMsg>(dept_msg_id, queue_mtype, issued) == -1) {
         Logger::log(LogSeverity::Err, Identity::Petent, "Blad wyslania biletu do urzednika.");
+        cleanup_child();
         ipc::shm::detach(shared_state);
         return 1;
     }
@@ -168,6 +215,7 @@ int petent_main(UrzednikRole department, bool is_vip) {
     while (true) {
         if (petent_evacuating) {
             log_evacuation();
+            cleanup_child();
             ipc::shm::detach(shared_state);
             return 0;
         }
@@ -176,6 +224,7 @@ int petent_main(UrzednikRole department, bool is_vip) {
             if (errno == EINTR) {
                 if (petent_evacuating) {
                     log_evacuation();
+                    cleanup_child();
                     ipc::shm::detach(shared_state);
                     return 0;
                 }
@@ -183,12 +232,14 @@ int petent_main(UrzednikRole department, bool is_vip) {
             }
             std::string error = "Blad odbioru potwierdzenia obslugi: " + std::string(std::strerror(errno));
             Logger::log(LogSeverity::Err, Identity::Petent, error);
+            cleanup_child();
             ipc::shm::detach(shared_state);
             return 1;
         }
         break;
     }
 
+    cleanup_child();
     ipc::shm::detach(shared_state);
     return 0;
 }

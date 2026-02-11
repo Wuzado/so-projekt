@@ -5,6 +5,7 @@
 #include <sys/wait.h>
 #include <thread>
 #include <unistd.h>
+#include <vector>
 #include "../common.h"
 #include "../ipcutils.h"
 #include "../logger.h"
@@ -43,16 +44,27 @@ static pid_t spawn_petent() {
             Logger::log(LogSeverity::Err, Identity::Generator, "Nieznany wydzial petenta.");
             _exit(1);
         }
-        // 1/10 chance of VIP priority status
+
         bool is_vip = rng::random_int(1, 10) == 1;
-        if (is_vip) {
-            Logger::log(LogSeverity::Notice, Identity::Generator, "Generuje petenta VIP do wydzialu " + std::string(*dept_name) + ".");
-            execl("/proc/self/exe", "so_projekt", "--role", "petent", "--dept", dept_name->data(),
-                  "--vip", static_cast<char*>(nullptr));
-        } else {
-            execl("/proc/self/exe", "so_projekt", "--role", "petent", "--dept", dept_name->data(),
-                  static_cast<char*>(nullptr));
-        }
+        bool has_child = rng::random_int(1, 10) == 1;
+
+        // Build log message
+        std::string log_msg = "Generuje petenta";
+        if (is_vip) log_msg += " VIP";
+        if (has_child) log_msg += " z dzieckiem";
+        log_msg += " do wydzialu " + std::string(*dept_name) + ".";
+        Logger::log(is_vip ? LogSeverity::Notice : LogSeverity::Info,
+                    Identity::Generator, log_msg);
+
+        // Build exec arguments dynamically
+        std::vector<const char*> args = {
+            "so_projekt", "--role", "petent", "--dept", dept_name->data()
+        };
+        if (is_vip) args.push_back("--vip");
+        if (has_child) args.push_back("--child");
+        args.push_back(nullptr);
+
+        execv("/proc/self/exe", const_cast<char* const*>(args.data()));
         perror("exec failed");
         _exit(1);
     }
