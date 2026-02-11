@@ -150,7 +150,6 @@ int urzednik_main(UrzednikRole role) {
                                         ", przekierowanie odrzucone.");
                         report::log_unserved_after_signal(resolve_report_day(shared_state), ticket.petent_id, target,
                                                          "SA");
-                        redirected = true;
                     }
                     else {
                         TicketIssuedMsg redirect_msg{};
