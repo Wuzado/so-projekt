@@ -8,7 +8,6 @@
 #include "../ipcutils.h"
 #include "../logger.h"
 
-constexpr long kTicketRequestType = 1;
 static volatile sig_atomic_t petent_evacuating = 0;
 
 static void handle_evacuation_signal(int) { petent_evacuating = 1; }

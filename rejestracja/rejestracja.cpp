@@ -6,7 +6,6 @@
 #include "../ipcutils.h"
 #include "../logger.h"
 
-constexpr long kTicketRequestType = 1;
 static volatile sig_atomic_t rejestracja_running = 1;
 static volatile sig_atomic_t stop_after_current = 0;
 

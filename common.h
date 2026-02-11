@@ -92,6 +92,7 @@ struct ServiceDoneMsg {
 // Urzednik processes use msgrcv(..., -kNormalQueueType, 0) to dequeue VIP first
 constexpr long kVipQueueType = 1;
 constexpr long kNormalQueueType = 2;
+constexpr long kTicketRequestType = 1;
 
 namespace rng {
     inline int random_int(int min_inclusive, int max_inclusive) {
