@@ -139,10 +139,12 @@ int generator_main(int min_delay_sec, int max_delay_sec, int time_mul, int max_c
         reap_children();
     }
 
-    // Send SIGUSR2 again to the process group as backup.
-    // Children will inherit SIG_IGN for SIGUSR2,
-    // and they may have installed their handlers after the dyrektor signal.
-    killpg(getpgrp(), SIGUSR2);
+    // Only send backup SIGUSR2 if the generator was told to stop externally
+    // (via SIGTERM from dyrektor). If we simply hit max_count, the simulation
+    // is still running and we must NOT signal the process group.
+    if (!generator_running) {
+        killpg(getpgrp(), SIGUSR2);
+    }
 
     // Wait for all children to exit.
     while (true) {
