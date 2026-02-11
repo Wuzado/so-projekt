@@ -94,8 +94,8 @@ static void sleep_scaled_seconds(int seconds, int time_mul) {
 
 int generator_main(int min_delay_sec, int max_delay_sec, int time_mul, int max_count) {
     ipc::install_signal_handler(SIGTERM, handle_shutdown_signal);
-    signal(SIGINT, SIG_IGN);
-    signal(SIGUSR2, SIG_IGN);
+    ipc::install_signal_handler(SIGINT, SIG_IGN);
+    ipc::install_signal_handler(SIGUSR2, SIG_IGN);
 
     Logger::log(LogSeverity::Info, Identity::Generator, "Generator petentow uruchomiony.");
 

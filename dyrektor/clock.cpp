@@ -66,7 +66,7 @@ void init_clock(SharedState* state, HoursOpen hours_open) {
 
             if (state->simulated_time >= hours_open.second * 3600 && !wait_after_close) {
                 state->office_status = OfficeStatus::Closed;
-                Logger::log(LogSeverity::Info, Identity::Dyrektor, "Urząd zamknięty.");
+                Logger::log(LogSeverity::Info, Identity::Dyrektor, "Urzad zamkniety.");
                 wait_after_close = true;
             }
         }
@@ -117,7 +117,7 @@ int start_clock(SharedState* shared_state, HoursOpen hours_open, pthread_t* out_
 
     auto* args = new ClockArgsHelper{shared_state, hours_open};
 
-    error_t create_err = ipc::thread::create(out_thread, clock_thread_main, args);
+    int create_err = ipc::thread::create(out_thread, clock_thread_main, args);
     if (create_err != 0) {
         Logger::log(LogSeverity::Emerg, Identity::Dyrektor, "Nie udalo sie uruchomic watku zegara.");
         delete args;
@@ -131,7 +131,7 @@ int stop_clock(pthread_t thread) {
     simulation_running = false;
     ipc::cond::broadcast(&restart_cv);
     Logger::log(LogSeverity::Info, Identity::Dyrektor, "Zatrzymywanie zegara symulacji...");
-    error_t join_err = ipc::thread::join(thread);
+    int join_err = ipc::thread::join(thread);
     if (join_err != 0) {
         Logger::log(LogSeverity::Emerg, Identity::Dyrektor, "Nie udalo sie dolaczyc do watku zegara.");
         return -1;
