@@ -17,7 +17,7 @@ if ! wait_for_log "Koniec dnia." 20; then
 fi
 
 assert_log "Dzien 1: Urzad otwarty."
-assert_log "Urząd zamknięty."
+assert_log "Urzad zamkniety."
 assert_log "Koniec dnia."
 assert_log "Wydano bilet nr"
 
