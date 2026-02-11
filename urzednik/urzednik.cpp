@@ -153,14 +153,13 @@ int urzednik_main(UrzednikRole role) {
                         redirected = true;
                     }
                     else {
-
-                    TicketIssuedMsg redirect_msg{};
-                    redirect_msg.petent_id = ticket.petent_id;
-                    redirect_msg.ticket_number = ticket_number;
-                    redirect_msg.department = target;
-                    redirect_msg.redirected_from_sa = 1;
-                    redirect_msg.reject_reason = TicketRejectReason::None;
-                    redirect_msg.is_vip = ticket.is_vip;
+                        TicketIssuedMsg redirect_msg{};
+                        redirect_msg.petent_id = ticket.petent_id;
+                        redirect_msg.ticket_number = ticket_number;
+                        redirect_msg.department = target;
+                        redirect_msg.redirected_from_sa = 1;
+                        redirect_msg.reject_reason = TicketRejectReason::None;
+                        redirect_msg.is_vip = ticket.is_vip;
 
                         // Use IPC_NOWAIT when shutting down to avoid blocking on a full queue
                         int redir_flags = stop_after_current ? IPC_NOWAIT : 0;
@@ -251,10 +250,8 @@ int urzednik_main(UrzednikRole role) {
         }
 
         if (!logged_unserved) {
-            report::log_unserved_after_signal(resolve_report_day(shared_state), 0, role, "DYREKTOR");
             Logger::log(LogSeverity::Notice, Identity::Urzednik, role,
-                        "skierowanie do " + std::string(urzednik_role_to_string(role).value_or("?")) +
-                            " - wystawil DYREKTOR - petent 0");
+                        "Brak nieobsluzonych petentow w kolejce przy zakonczeniu pracy.");
         }
     }
 
