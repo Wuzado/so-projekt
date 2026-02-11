@@ -103,7 +103,8 @@ using process::UrzednikProcess;
 using process::UrzednikQueue;
 
 int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& department_limits, int time_mul,
-                  int gen_min_delay_sec, int gen_max_delay_sec, int gen_max_count, bool spawn_generator, bool one_day) {
+                  int gen_min_delay_sec, int gen_max_delay_sec, int gen_max_count, bool spawn_generator, bool one_day,
+                  int building_capacity) {
     ipc::install_signal_handler(SIGINT, handle_shutdown_signal);
     ipc::install_signal_handler(SIGTERM, handle_shutdown_signal);
     ipc::install_signal_handler(SIGUSR2, handle_shutdown_signal);
@@ -147,7 +148,8 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
         department_limits[0] * 2u
     };
 
-    new (shared_state) SharedState(100, ticket_limits, static_cast<uint32_t>(time_mul));
+    new (shared_state) SharedState(static_cast<uint32_t>(building_capacity), ticket_limits,
+                                   static_cast<uint32_t>(time_mul));
 
     key_t msg_req_key = ipc::make_key(ipc::KeyType::MsgQueueRejestracja);
     if (msg_req_key == -1) {
@@ -210,7 +212,7 @@ int dyrektor_main(HoursOpen hours_open, const std::array<uint32_t, 5>& departmen
     }
 
     process::ProcessConfig process_config{hours_open, department_limits, time_mul, gen_min_delay_sec, gen_max_delay_sec,
-                                          gen_max_count, one_day};
+                                          gen_max_count, one_day, building_capacity};
 
     std::vector<UrzednikProcess> urzednik_pids;
     pid_t generator_pid = -1;

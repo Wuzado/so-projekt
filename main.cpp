@@ -21,6 +21,8 @@ void print_usage(char* program_name) {
               << "Godzina otwarcia urzedu (0-23), domyslnie 8\n"
               << "  --Tk <godzina>  "
               << "Godzina zamkniecia urzedu (0-23), domyslnie 16\n"
+              << "  --N <liczba>  "
+              << "Maksymalna liczba petentow w budynku, domyslnie 100\n"
               << "  --X1 <limit>    "
               << "Limit przyjec dla urzednikow SA (na urzednika), domyslnie 2000\n"
               << "  --X2 <limit>    "
@@ -56,6 +58,7 @@ struct Config {
     int X3 = 1000;
     int X4 = 1000;
     int X5 = 1000;
+    int building_capacity = 100;
     int time_mul = 1000;
     int gen_min_delay_sec = 1;
     int gen_max_delay_sec = 5;
@@ -126,6 +129,13 @@ struct Config {
                 config.X5 = std::stoi(argv[++i]);
                 if (config.X5 < 0) {
                     std::cerr << "Blad: --X5 musi byc >= 0\n";
+                    return std::nullopt;
+                }
+            }
+            else if (arg == "--N" && i + 1 < argc) {
+                config.building_capacity = std::stoi(argv[++i]);
+                if (config.building_capacity <= 0) {
+                    std::cerr << "Blad: --N musi byc > 0\n";
                     return std::nullopt;
                 }
             }
@@ -212,6 +222,7 @@ int main(int argc, char* argv[]) {
     Logger::log(LogSeverity::Debug, config->role, "Config:" 
         " Tp=" + std::to_string(config->Tp) +
         " Tk=" + std::to_string(config->Tk) +
+        " N=" + std::to_string(config->building_capacity) +
         " X1=" + std::to_string(config->X1) +
         " X2=" + std::to_string(config->X2) +
         " X3=" + std::to_string(config->X3) +
@@ -237,7 +248,7 @@ int main(int argc, char* argv[]) {
             };
             dyrektor_main({config->Tp, config->Tk}, department_limits, config->time_mul,
                           config->gen_min_delay_sec, config->gen_max_delay_sec, config->gen_max_count,
-                          config->spawn_generator, config->one_day);
+                          config->spawn_generator, config->one_day, config->building_capacity);
             break;
         }
         case Identity::Rejestracja:

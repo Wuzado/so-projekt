@@ -16,6 +16,7 @@ struct ProcessConfig {
     int gen_max_delay_sec;
     int gen_max_count;
     bool one_day;
+    int building_capacity;
 };
 
 struct UrzednikProcess {

@@ -29,6 +29,8 @@ namespace process {
         args.emplace_back(std::to_string(config.department_limits[3]));
         args.emplace_back("--X5");
         args.emplace_back(std::to_string(config.department_limits[4]));
+        args.emplace_back("--N");
+        args.emplace_back(std::to_string(config.building_capacity));
         args.emplace_back("--time-mul");
         args.emplace_back(std::to_string(config.time_mul));
         args.emplace_back("--gen-min-delay");
