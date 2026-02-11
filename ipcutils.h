@@ -6,6 +6,7 @@
 #include <cerrno>
 #include <ctime>
 #include <csignal>
+#include <initializer_list>
 #include <pthread.h>
 #include <sys/ipc.h>
 #include <sys/msg.h>
@@ -24,6 +25,22 @@ namespace ipc {
         sa.sa_flags = 0; // w/o SA_RESTART
         if (sigaction(signum, &sa, nullptr) == -1) {
             perror("sigaction failed");
+            return -1;
+        }
+        return 0;
+    }
+
+    // Block given signals in the current thread
+    inline int block_signals(std::initializer_list<int> signals) {
+        sigset_t mask;
+        sigemptyset(&mask);
+        for (int sig : signals) {
+            sigaddset(&mask, sig);
+        }
+        int rc = pthread_sigmask(SIG_BLOCK, &mask, nullptr);
+        if (rc != 0) {
+            errno = rc;
+            perror("pthread_sigmask failed");
             return -1;
         }
         return 0;

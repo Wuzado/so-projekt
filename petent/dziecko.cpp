@@ -8,6 +8,9 @@
 static void* child_thread_func(void* arg) {
     auto* data = static_cast<ChildThreadData*>(arg);
 
+    // Signals should go to the main thread
+    ipc::block_signals({SIGUSR2, SIGTERM, SIGINT});
+
     Logger::log(LogSeverity::Info, Identity::Petent,
                 "Dziecko (rodzic PID: " + std::to_string(data->parent_pid) +
                 ") wchodzi do urzedu z rodzicem.");
