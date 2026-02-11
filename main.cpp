@@ -210,6 +210,7 @@ struct Config {
 };
 
 int main(int argc, char* argv[]) {
+    Logger::set_log_file("./so_projekt.log");
     auto config = Config::parse_arguments(argc, argv);
     if (!config) {
         print_usage(argv[0]);

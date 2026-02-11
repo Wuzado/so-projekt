@@ -20,7 +20,7 @@ enum class LogSeverity { Emerg, Alert, Crit, Err, Warning, Notice, Info, Debug }
 
 class Logger {
 private:
-    inline static std::string log_file_path = "/tmp/so_projekt.log";
+    inline static std::string log_file_path = "./so_projekt.log";
 
     static constexpr std::string_view severity_to_string(LogSeverity severity) noexcept {
         switch (severity) {
@@ -117,7 +117,6 @@ private:
             }
 
             flock(fd, LOCK_UN);
-            return;
         }
 
         int fd = open(log_file_path.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0644);
