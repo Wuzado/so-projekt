@@ -34,16 +34,22 @@ static void* child_thread_func(void* arg) {
     return nullptr;
 }
 
-void child_init(ChildThreadData* data, pid_t parent_pid, volatile sig_atomic_t* evacuating) {
+int child_init(ChildThreadData* data, pid_t parent_pid, volatile sig_atomic_t* evacuating) {
     data->done = false;
     data->parent_pid = parent_pid;
     data->evacuating = evacuating;
-    ipc::mutex::init(&data->mutex);
-    ipc::cond::init(&data->cond);
+    if (ipc::mutex::init(&data->mutex) == -1) {
+        return -1;
+    }
+    if (ipc::cond::init(&data->cond) == -1) {
+        ipc::mutex::destroy(&data->mutex);
+        return -1;
+    }
+    return 0;
 }
 
-void child_start(ChildThreadData* data, pthread_t* thread) {
-    ipc::thread::create(thread, child_thread_func, data);
+int child_start(ChildThreadData* data, pthread_t* thread) {
+    return ipc::thread::create(thread, child_thread_func, data);
 }
 
 void child_signal_done(ChildThreadData* data) {

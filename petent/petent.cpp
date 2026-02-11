@@ -94,8 +94,22 @@ int petent_main(UrzednikRole department, bool is_vip, bool has_child) {
     };
 
     if (has_child) {
-        child_init(&child_data, getpid(), &petent_evacuating);
-        child_start(&child_data, &child_thread);
+        if (child_init(&child_data, getpid(), &petent_evacuating) == -1) {
+            Logger::log(LogSeverity::Err, Identity::Petent, "Blad inicjalizacji watku dziecka.");
+            ipc::sem::post(sem_id, 0); // release child's slot
+            ipc::sem::post(sem_id, 0); // release parent's slot
+            ipc::shm::detach(shared_state);
+            return 1;
+        }
+        if (child_start(&child_data, &child_thread) == -1) {
+            Logger::log(LogSeverity::Err, Identity::Petent, "Blad uruchomienia watku dziecka.");
+            ipc::mutex::destroy(&child_data.mutex);
+            ipc::cond::destroy(&child_data.cond);
+            ipc::sem::post(sem_id, 0); // release child's slot
+            ipc::sem::post(sem_id, 0); // release parent's slot
+            ipc::shm::detach(shared_state);
+            return 1;
+        }
         child_spawned = true;
         Logger::log(LogSeverity::Info, Identity::Petent, "Petent wchodzi do urzedu z dzieckiem.");
     }

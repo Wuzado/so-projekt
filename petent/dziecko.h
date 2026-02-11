@@ -14,9 +14,9 @@ struct ChildThreadData {
     volatile sig_atomic_t* evacuating; // pointer to parent's evacuation flag
 };
 
-void child_init(ChildThreadData* data, pid_t parent_pid, volatile sig_atomic_t* evacuating);
+int child_init(ChildThreadData* data, pid_t parent_pid, volatile sig_atomic_t* evacuating);
 
-void child_start(ChildThreadData* data, pthread_t* thread);
+int child_start(ChildThreadData* data, pthread_t* thread);
 
 void child_signal_done(ChildThreadData* data);
 
