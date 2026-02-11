@@ -57,8 +57,9 @@ static pid_t spawn_petent() {
                     Identity::Generator, log_msg);
 
         // Build exec arguments dynamically
+        std::string dept_str(*dept_name);
         std::vector<const char*> args = {
-            "so_projekt", "--role", "petent", "--dept", dept_name->data()
+            "so_projekt", "--role", "petent", "--dept", dept_str.c_str()
         };
         if (is_vip) args.push_back("--vip");
         if (has_child) args.push_back("--child");
