@@ -170,7 +170,7 @@ namespace ipc {
                 if (errno == EINTR) {
                     return -1;
                 }
-                if (!(flags & IPC_NOWAIT && errno == ENOMSG)) {
+                if (!((flags & IPC_NOWAIT) && errno == ENOMSG)) {
                     perror("msgrcv failed");
                 }
                 return -1;
