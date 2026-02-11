@@ -11,7 +11,7 @@
 #include "../logger.h"
 #include "../report.h"
 
-constexpr long kUrzednikQueueType = 1;
+constexpr long kPriorityMsgType = -kNormalQueueType; // negative = dequeue lowest mtype first
 static volatile sig_atomic_t urzednik_running = 1;
 static volatile sig_atomic_t stop_after_current = 0;
 
@@ -82,7 +82,7 @@ int urzednik_main(UrzednikRole role) {
 
     while (urzednik_running) {
         TicketIssuedMsg ticket{};
-        int rc = ipc::msg::receive<TicketIssuedMsg>(msg_id, kUrzednikQueueType, &ticket, 0);
+        int rc = ipc::msg::receive<TicketIssuedMsg>(msg_id, kPriorityMsgType, &ticket, 0);
         if (rc == -1) {
             if (errno == EINTR) {
                 if (!urzednik_running || stop_after_current) {
@@ -100,9 +100,15 @@ int urzednik_main(UrzednikRole role) {
             break;
         }
 
-        Logger::log(LogSeverity::Info, Identity::Urzednik, role,
-                    "Rozpoczecie obslugi petenta " + std::to_string(ticket.petent_id) + " (bilet " +
-                        std::to_string(ticket.ticket_number) + ").");
+        if (ticket.is_vip) {
+            Logger::log(LogSeverity::Info, Identity::Urzednik, role,
+                        "Rozpoczecie obslugi petenta VIP " + std::to_string(ticket.petent_id) + " (bilet " +
+                            std::to_string(ticket.ticket_number) + ").");
+        } else {
+            Logger::log(LogSeverity::Info, Identity::Urzednik, role,
+                        "Rozpoczecie obslugi petenta " + std::to_string(ticket.petent_id) + " (bilet " +
+                            std::to_string(ticket.ticket_number) + ").");
+        }
 
         short_work_delay(static_cast<int>(shared_state->time_mul));
 
@@ -154,18 +160,26 @@ int urzednik_main(UrzednikRole role) {
                     redirect_msg.department = target;
                     redirect_msg.redirected_from_sa = 1;
                     redirect_msg.reject_reason = TicketRejectReason::None;
+                    redirect_msg.is_vip = ticket.is_vip;
 
                         // Use IPC_NOWAIT when shutting down to avoid blocking on a full queue
                         int redir_flags = stop_after_current ? IPC_NOWAIT : 0;
-                        if (ipc::msg::send<TicketIssuedMsg>(target_msg_id, kUrzednikQueueType, redirect_msg, redir_flags) == -1) {
+                        long redir_mtype = ticket.is_vip ? kVipQueueType : kNormalQueueType;
+                        if (ipc::msg::send<TicketIssuedMsg>(target_msg_id, redir_mtype, redirect_msg, redir_flags) == -1) {
                             std::string error =
                                 "Blad wyslania przekierowania dla petenta " + std::to_string(ticket.petent_id);
                             Logger::log(LogSeverity::Err, Identity::Urzednik, role, error);
                         }
                         else {
-                            Logger::log(LogSeverity::Notice, Identity::Urzednik, role,
-                                        "Przekierowano petenta " + std::to_string(ticket.petent_id) +
-                                            " do innego wydzialu.");
+                            if (ticket.is_vip) {
+                                Logger::log(LogSeverity::Notice, Identity::Urzednik, role,
+                                            "Przekierowano petenta VIP " + std::to_string(ticket.petent_id) +
+                                                " do innego wydzialu.");
+                            } else {
+                                Logger::log(LogSeverity::Notice, Identity::Urzednik, role,
+                                            "Przekierowano petenta " + std::to_string(ticket.petent_id) +
+                                                " do innego wydzialu.");
+                            }
                             redirected = true;
                         }
                     }
@@ -178,8 +192,13 @@ int urzednik_main(UrzednikRole role) {
         }
 
         if (!redirected) {
-            Logger::log(LogSeverity::Info, Identity::Urzednik, role,
-                        "Zakonczono obsluge petenta " + std::to_string(ticket.petent_id) + ".");
+            if (ticket.is_vip) {
+                Logger::log(LogSeverity::Info, Identity::Urzednik, role,
+                            "Zakonczono obsluge petenta VIP " + std::to_string(ticket.petent_id) + ".");
+            } else {
+                Logger::log(LogSeverity::Info, Identity::Urzednik, role,
+                            "Zakonczono obsluge petenta " + std::to_string(ticket.petent_id) + ".");
+            }
 
             if (msg_req_id != -1) {
                 ServiceDoneMsg done{};
@@ -203,7 +222,7 @@ int urzednik_main(UrzednikRole role) {
         bool logged_unserved = false;
         while (true) {
             TicketIssuedMsg ticket{};
-            int rc = ipc::msg::receive<TicketIssuedMsg>(msg_id, kUrzednikQueueType, &ticket, IPC_NOWAIT);
+            int rc = ipc::msg::receive<TicketIssuedMsg>(msg_id, kPriorityMsgType, &ticket, IPC_NOWAIT);
             if (rc == -1) {
                 if (errno == ENOMSG) {
                     break;

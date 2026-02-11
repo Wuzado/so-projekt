@@ -79,7 +79,7 @@ struct TicketIssuedMsg {
     UrzednikRole department; // uint8_t
     uint8_t redirected_from_sa; // boolean
     TicketRejectReason reject_reason; // uint8_t
-    uint8_t padding; // for explicit alignment
+    uint8_t is_vip; // boolean - priority queue flag
 };
 
 struct ServiceDoneMsg {
@@ -87,6 +87,11 @@ struct ServiceDoneMsg {
     UrzednikRole department; // uint8_t
     uint8_t padding[3]; // for explicit alignment
 };
+
+// Priority mtype values for department queues
+// Urzednik processes use msgrcv(..., -kNormalQueueType, 0) to dequeue VIP first
+constexpr long kVipQueueType = 1;
+constexpr long kNormalQueueType = 2;
 
 namespace rng {
     inline int random_int(int min_inclusive, int max_inclusive) {

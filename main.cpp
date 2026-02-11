@@ -62,6 +62,7 @@ struct Config {
     int gen_max_count = -1;
     bool spawn_generator = false;
     bool one_day = false;
+    bool vip = false;
     std::optional<UrzednikRole> urzednik_role;
 
     static std::optional<Config> parse_arguments(int argc, char* argv[]) {
@@ -161,6 +162,9 @@ struct Config {
             else if (arg == "--one-day") {
                 config.one_day = true;
             }
+            else if (arg == "--vip") {
+                config.vip = true;
+            }
             else if (arg == "--dept" && i + 1 < argc) {
                 auto role_opt = string_to_urzednik_role(argv[++i]);
                 if (!role_opt) {
@@ -247,7 +251,7 @@ int main(int argc, char* argv[]) {
                 Logger::log(LogSeverity::Err, Identity::Petent, "Brak parametru --dept.");
                 return 1;
             }
-            petent_main(*config->urzednik_role);
+            petent_main(*config->urzednik_role, config->vip);
             break;
         case Identity::Generator:
             generator_main(config->gen_min_delay_sec, config->gen_max_delay_sec, config->time_mul,

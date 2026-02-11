@@ -43,8 +43,16 @@ static pid_t spawn_petent() {
             Logger::log(LogSeverity::Err, Identity::Generator, "Nieznany wydzial petenta.");
             _exit(1);
         }
-        execl("/proc/self/exe", "so_projekt", "--role", "petent", "--dept", dept_name->data(),
-              static_cast<char*>(nullptr));
+        // 1/10 chance of VIP priority status
+        bool is_vip = rng::random_int(1, 10) == 1;
+        if (is_vip) {
+            Logger::log(LogSeverity::Notice, Identity::Generator, "Generuje petenta VIP do wydzialu " + std::string(*dept_name) + ".");
+            execl("/proc/self/exe", "so_projekt", "--role", "petent", "--dept", dept_name->data(),
+                  "--vip", static_cast<char*>(nullptr));
+        } else {
+            execl("/proc/self/exe", "so_projekt", "--role", "petent", "--dept", dept_name->data(),
+                  static_cast<char*>(nullptr));
+        }
         perror("exec failed");
         _exit(1);
     }

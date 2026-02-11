@@ -8,7 +8,6 @@
 #include "../logger.h"
 
 constexpr long kTicketRequestType = 1;
-constexpr long kUrzednikQueueType = 1;
 static volatile sig_atomic_t petent_evacuating = 0;
 
 static void handle_evacuation_signal(int) { petent_evacuating = 1; }
@@ -17,7 +16,7 @@ static void log_evacuation() {
     Logger::log(LogSeverity::Notice, Identity::Petent, "Ewakuacja - petent opuszcza budynek.");
 }
 
-int petent_main(UrzednikRole department) {
+int petent_main(UrzednikRole department, bool is_vip) {
     ipc::install_signal_handler(SIGUSR2, handle_evacuation_signal);
     ipc::install_signal_handler(SIGTERM, handle_evacuation_signal);
     ipc::install_signal_handler(SIGINT, handle_evacuation_signal);
@@ -78,8 +77,12 @@ int petent_main(UrzednikRole department) {
     TicketRequestMsg request{};
     request.petent_id = petent_id;
     request.department = department;
-    request.is_vip = rng::random_int(1, 100) <= 10 ? 1 : 0;
+    request.is_vip = is_vip;
     request.has_child = rng::random_int(1, 100) <= 20 ? 1 : 0;
+
+    if (is_vip) {
+        Logger::log(LogSeverity::Notice, Identity::Petent, "Petent VIP - wysylam zadanie biletu.");
+    }
 
     if (ipc::msg::send<TicketRequestMsg>(msg_req_id, kTicketRequestType, request) == -1) {
         Logger::log(LogSeverity::Err, Identity::Petent, "Blad wyslania prosby o bilet.");
@@ -146,14 +149,20 @@ int petent_main(UrzednikRole department) {
         return 1;
     }
 
-    if (ipc::msg::send<TicketIssuedMsg>(dept_msg_id, kUrzednikQueueType, issued) == -1) {
+    long queue_mtype = issued.is_vip ? kVipQueueType : kNormalQueueType;
+    if (ipc::msg::send<TicketIssuedMsg>(dept_msg_id, queue_mtype, issued) == -1) {
         Logger::log(LogSeverity::Err, Identity::Petent, "Blad wyslania biletu do urzednika.");
         ipc::shm::detach(shared_state);
         return 1;
     }
 
-    Logger::log(LogSeverity::Info, Identity::Petent,
-                "Petent zglosil sie do urzednika z biletem " + std::to_string(issued.ticket_number) + ".");
+    if (issued.is_vip) {
+        Logger::log(LogSeverity::Info, Identity::Petent,
+                    "Petent VIP - wchodzi do kolejki priorytetowej z biletem " + std::to_string(issued.ticket_number) + ".");
+    } else {
+        Logger::log(LogSeverity::Info, Identity::Petent,
+                    "Petent zglosil sie do urzednika z biletem " + std::to_string(issued.ticket_number) + ".");
+    }
 
     ServiceDoneMsg done{};
     while (true) {

@@ -159,6 +159,7 @@ int rejestracja_main() {
         issued.department = department;
         issued.redirected_from_sa = 0;
         issued.reject_reason = TicketRejectReason::None;
+        issued.is_vip = request.is_vip;
 
         if (ipc::msg::send<TicketIssuedMsg>(msg_req_id, static_cast<long>(request.petent_id), issued) == -1) {
             std::string error = "Blad wyslania biletu dla petenta " + std::to_string(request.petent_id);
