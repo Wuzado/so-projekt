@@ -82,7 +82,7 @@ static void drain_unserved_tickets(const std::vector<process::UrzednikQueue>& qu
     for (const auto& queue : queues) {
         while (true) {
             TicketIssuedMsg ticket{};
-            int rc = ipc::msg::receive<TicketIssuedMsg>(queue.msg_id, 1, &ticket, IPC_NOWAIT);
+            int rc = ipc::msg::receive<TicketIssuedMsg>(queue.msg_id, -kNormalQueueType, &ticket, IPC_NOWAIT);
             if (rc == -1) {
                 if (errno == ENOMSG) {
                     break;
